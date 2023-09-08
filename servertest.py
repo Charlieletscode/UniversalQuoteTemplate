@@ -11,8 +11,8 @@ SQLaddress = os.environ.get("addressGFT")
 
 parameter_value = "230524-0173"
 
+
 def getBinddes(input):
-    
     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
@@ -66,7 +66,8 @@ def getAllPrice(ticketN):
     cursor.execute(sql_query, ticketN)
     sql_query = cursor.fetchall()
     rows_transposed = [sql_query for sql_query in zip(*sql_query)]
-    ticketDf = pd.DataFrame(dict(zip(["LOC_Address", "LOC_CUSTNMBR", "LOC_LOCATNNM", "LOC_ADRSCODE", "LOC_CUSTNAME", "LOC_PHONE", "CITY", "STATE", "ZIP", "Pricing_Matrix_Name", "BranchName", "CUST_NAME", "CUST_ADDRESS1", "CUST_ADDRESS2", "CUST_ADDRESS3", "CUST_CITY", "CUST_State", "CUST_Zip", "Tax_Rate", "MailDispatch", "Purchase_Order", "Bill_Customer_Number"], rows_transposed)))
+    ticketDf = pd.DataFrame(dict(zip(["LOC_Address", "LOC_CUSTNMBR", "LOC_LOCATNNM", "LOC_ADRSCODE", "LOC_CUSTNAME", "LOC_PHONE", "CITY", "STATE", "ZIP", "Pricing_Matrix_Name", "Divisions", "CUST_NAME", "CUST_ADDRESS1", "CUST_ADDRESS2", "CUST_ADDRESS3", "CUST_CITY", "CUST_State", "CUST_Zip", "Tax_Rate", "MailDispatch", "Purchase_Order", "Bill_Customer_Number"], rows_transposed)))
+
     sql_query = """Exec [CF_Univ_Quote_LRates] @Service_TK = ?;"""
     cursor.execute(sql_query, ticketN)
     sql_query = cursor.fetchall()
@@ -89,42 +90,40 @@ def getAllPrice(ticketN):
     cursor.close()
     conn.close()
     return ticketDf, LRatesDf, TRatesDf, misc_ops_df
-
 def getDesc(ticket):
     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
-    select_query = "Exec CF_Univ_GetWorkDescription @TicketID = ?"
+    select_query = "SELECT * FROM [CF_Universal_workdescription_insert] WHERE TicketID = ?"
     cursor.execute(select_query, (ticket,))
     dataset = cursor.fetchall()
     cursor.close()
     conn.close()
-    data = [list(row) for row in dataset]
-    workDes = pd.DataFrame(data, columns=["Incurred", "Proposed"])
-    return workDes
-
+    if len(dataset) == 0:
+        return "None", 1, "None"
+    return dataset[0][1], dataset[0][2], dataset[0][3]
 def getAllTicket(ticket):
     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
 
-    select_query = "Exec CF_Univ_GetWorkLabor @TicketID = ?"
+    select_query = "SELECT Description, Nums_of_Techs, Hours_per_Tech, QTY, Hourly_Rate, Extended FROM [CF_Universal_labor_insert] WHERE TicketID = ?"
     cursor.execute(select_query, (ticket,))
     dataset = cursor.fetchall()
     data = [list(row) for row in dataset]
-    ticketLaborDf = pd.DataFrame(data, columns=["Incurred/Proposed", "Description", "Nums of Techs", "Hours per Tech", "QTY", "Hourly Rate", "EXTENDED"])
+    ticketLaborDf = pd.DataFrame(data, columns=["Description", "Nums of Techs", "Hours per Tech", "QTY", "Hourly Rate", "EXTENDED"])
+    
+    select_query = "SELECT Description, QTY, CAST([UNIT_Price] AS FLOAT) AS [UNIT_Price], CAST(EXTENDED AS FLOAT) AS EXTENDED FROM [CF_Universal_trip_charge_insert] WHERE TicketID = ?"
+    cursor.execute(select_query, (ticket,))
+    dataset = cursor.fetchall()
+    data = [list(row) for row in dataset]
+    ticketTripDf = pd.DataFrame(data, columns=["Description", "QTY", "UNIT Price", "EXTENDED"])
 
-    select_query = "Exec CF_Univ_GetTravelLabor @TicketID = ?"
+    select_query = "SELECT Description, QTY, CAST([UNIT_Price] AS FLOAT) AS [UNIT_Price], CAST(EXTENDED AS FLOAT) AS EXTENDED FROM [CF_Universal_parts_insert] WHERE TicketID = ?"
     cursor.execute(select_query, (ticket,))
     dataset = cursor.fetchall()
     data = [list(row) for row in dataset]
-    ticketTripDf = pd.DataFrame(data, columns=["Incurred/Proposed", "Description", "QTY", "UNIT Price", "EXTENDED"])
-
-    select_query = "Exec CF_Univ_GetParts @TicketID = ?"
-    cursor.execute(select_query, (ticket,))
-    dataset = cursor.fetchall()
-    data = [list(row) for row in dataset]
-    ticketPartsDf = pd.DataFrame(data, columns=["Incurred/Proposed", "Description", "QTY", "UNIT Price", "EXTENDED"])
+    ticketPartsDf = pd.DataFrame(data, columns=["Description", "QTY", "UNIT Price", "EXTENDED"])
 
     select_query = "SELECT Description, QTY, CAST([UNIT_Price] AS FLOAT) AS [UNIT_Price], CAST(EXTENDED AS FLOAT) AS EXTENDED FROM [CF_Universal_misc_charge_insert] WHERE TicketID = ?"
     cursor.execute(select_query, (ticket,))
@@ -147,17 +146,19 @@ def getAllTicket(ticket):
     cursor.close()
     conn.close()
     return ticketLaborDf, ticketTripDf, ticketPartsDf, ticketMiscDf, ticketMaterialsDf, ticketSubDf
-def updateAll(ticket, incurred, proposed, laborDf,  tripDf, partsDf, miscDf, materialDf, subDf):
+
+def updateAll(ticket, desc, editable, NTE_Quote, laborDf,  tripDf, partsDf, miscDf, materialDf, subDf):
     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
     
+    # if desc != "None":
     delete_query = "DELETE FROM [CF_Universal_workdescription_insert] WHERE TicketID = ?"
     cursor.execute(delete_query, (ticket,))
     conn.commit()
 
-    insert_query = "INSERT INTO [CF_Universal_workdescription_insert] (TicketID, Incurred_Workdescription, Proposed_Workdescription) VALUES (?, ?, ?)"
-    insert_data = [(ticket, incurred, proposed)]
+    insert_query = "INSERT INTO [CF_Universal_workdescription_insert] (TicketID, workdescription, editable, NTE_Quote) VALUES (?, ?, ?, ?)"
+    insert_data = [(ticket, desc, editable, NTE_Quote)]
     cursor.executemany(insert_query, insert_data)
     conn.commit()
 
@@ -230,159 +231,10 @@ def updateAll(ticket, incurred, proposed, laborDf,  tripDf, partsDf, miscDf, mat
         cursor.executemany(insert_query, data)
     conn.commit()
 
-def getBranch():
-    conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
-    conn = pyodbc.connect(conn_str)
-    cursor = conn.cursor()
-
-    sql_query = '''
-        SELECT DISTINCT RTrim(Wennsoft_Branch) as Wennsoft_Branch , Rtrim(BranchName) as BranchName FROM [dbo].[GFT_SV00077_Ext]
-        WHERE Wennsoft_Branch <> 'Pensacola' AND BranchName NOT IN ('Pensacola', 'Corporate', 'Guardian Connect')
-        '''    
-    cursor.execute(sql_query)
-    result = cursor.fetchall()
-    rows_transposed = [result for result in zip(*result)]
-    branchDf = pd.DataFrame(dict(zip(['Wennsoft_Branch', 'BranchName'], rows_transposed)))
     cursor.close()
     conn.close()
-    return branchDf
 
-# def getParentByTicket(ticket):
-#     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
-#     conn = pyodbc.connect(conn_str)
-#     cursor = conn.cursor()
-    
-#     select_query = '''
-#         SELECT [TicketID]
-#                ,[Status]
-#                ,[NTE_QUOTE]
-#                ,[Editable]
-#                ,[Insertdate]
-#                ,[Approvedate]
-#                ,[Declinedate]
-#         FROM [GFT].[dbo].[CF_Universal_Quote_Parent]
-#         WHERE TicketID BETWEEN ? AND ?
-#     '''
-    
-#     ticket_prefix, ticket_number = ticket.split('-')
-#     lower_bound = int(ticket_number) - 10
-#     upper_bound = int(ticket_number) + 10
-#     lower_ticket = f"{ticket_prefix}-{lower_bound:04d}"
-#     upper_ticket = f"{ticket_prefix}-{upper_bound:04d}"
-#     cursor.execute(select_query, (lower_ticket,upper_ticket))
-#     dataset = cursor.fetchall()
-#     data = [list(row) for row in dataset]
-#     parentDf = pd.DataFrame(data, columns=["TicketID", "Status", "NTE_QUOTE", "Editable", "Insertdate", "Approvedate", "Declinedate"])
-#     conn.close()
-#     if parentDf.empty:
-#         start_ticket = 173 
-#         num_rows = 10
-#         data = {
-#             'TicketID': [f'230524-{str(start_ticket + i).zfill(4)}' for i in range(num_rows)],
-#             'Status': ['Open', 'Closed', 'Pending', 'Closed', 'Open', 'Pending', 'Closed', 'Open', 'Pending', 'Closed'],
-#             'NTE_QUOTE': [random.randint(0, 1) for _ in range(num_rows)],
-#             'Editable': [random.randint(0, 1) for _ in range(num_rows)],
-#             'Insertdate': [datetime(2023, 8, 15), datetime(2023, 8, 10), datetime(2023, 8, 20), datetime(2023, 8, 25),
-#                         datetime(2023, 8, 5), datetime(2023, 8, 18), datetime(2023, 8, 12), datetime(2023, 8, 22),
-#                         datetime(2023, 8, 8), datetime(2023, 8, 28)],
-#             'Approvedate': [datetime(2023, 8, 14), datetime(2023, 8, 9), datetime(2023, 8, 19), datetime(2023, 8, 24),
-#                             datetime(2023, 8, 4), datetime(2023, 8, 17), datetime(2023, 8, 11), datetime(2023, 8, 21),
-#                             datetime(2023, 8, 7), datetime(2023, 8, 27)],
-#             'Declinedate': [datetime(2023, 8, 13), datetime(2023, 8, 8), datetime(2023, 8, 18), datetime(2023, 8, 23),
-#                             datetime(2023, 8, 3), datetime(2023, 8, 16), datetime(2023, 8, 10), datetime(2023, 8, 20),
-#                             datetime(2023, 8, 6), datetime(2023, 8, 26)],
-#         }
-#         parentDf = pd.DataFrame(data)
-#     return parentDf
+# getBinddes("microphone")
+# getPartsPrice('GILT20011 G1','GIL0001')
 
-def getParent(branchName):
-    conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
-    conn = pyodbc.connect(conn_str)
-    cursor = conn.cursor()
-    
-    select_query = '''
-        SELECT [TicketID]
-               ,[Status]
-               ,[NTE_QUOTE]
-               ,[Editable]
-               ,[Insertdate]
-               ,[Approvedate]
-               ,[Declinedate]
-        FROM [GFT].[dbo].[CF_Universal_Quote_Parent]
-        WHERE BranchName IN ({})
-    '''.format(', '.join(['?'] * len(branchName)))
-    
-    cursor.execute(select_query, branchName)
-    dataset = cursor.fetchall()
-    data = [list(row) for row in dataset]
-    parentDf = pd.DataFrame(data, columns=["TicketID", "Status", "NTE_QUOTE", "Editable", "Insertdate", "Approvedate", "Declinedate"])
-    conn.close()
-    return parentDf
-
-def updateParent(ticket, editable, ntequote, savetime, approved, declined, branchname):
-    conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
-    conn = pyodbc.connect(conn_str)
-    cursor = conn.cursor()
-    if(ntequote=="NTE"):
-        ntequote = 2
-    else:
-        ntequote = 1
-
-    select_query = '''
-        SELECT [TicketID]
-               ,[Status]
-               ,[NTE_QUOTE]
-               ,[Editable]
-               ,[Insertdate]
-               ,[Approvedate]
-               ,[Declinedate]
-               ,[BranchName]
-        FROM [GFT].[dbo].[CF_Universal_Quote_Parent]
-        WHERE TicketID = ?
-    '''
-    cursor.execute(select_query, (ticket,))
-    dataset = cursor.fetchall()
-
-    if not dataset:
-            insert_query = '''INSERT INTO [GFT].[dbo].[CF_Universal_Quote_Parent] (
-            TicketID, Status
-            ,NTE_QUOTE
-            ,Editable
-            ,Insertdate
-            ,Approvedate,Declinedate, BranchName) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'''
-            cursor.execute(insert_query, (ticket, "Pending", ntequote, 0, savetime, approved, declined, branchname))
-            conn.commit()
-    else:
-        for row in dataset:
-            ticket_id, status, nte_quote, editable, insert_date, approve_date, decline_date, branch = row
-        if declined == "1900-01-01 00:00:00.000":
-            delete_query = "DELETE FROM [GFT].[dbo].[CF_Universal_Quote_Parent] WHERE TicketID = ?"
-            cursor.execute(delete_query, (ticket,))
-            conn.commit()
-            insert_query = '''INSERT INTO [GFT].[dbo].[CF_Universal_Quote_Parent] (
-            TicketID, Status
-            ,NTE_QUOTE
-            ,Editable
-            ,Insertdate
-            ,Approvedate,Declinedate, BranchName) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'''
-            
-            cursor.execute(insert_query, (ticket, "Approved", ntequote, 0, insert_date, approved, "1900-01-01 00:00:00.000", branchname))
-            conn.commit()
-        else:
-            delete_query = "DELETE FROM [GFT].[dbo].[CF_Universal_Quote_Parent] WHERE TicketID = ?"
-            cursor.execute(delete_query, (ticket,))
-            conn.commit()
-            insert_query = '''INSERT INTO [GFT].[dbo].[CF_Universal_Quote_Parent] (
-            TicketID, Status
-            ,NTE_QUOTE
-            ,Editable
-            ,Insertdate
-            ,Approvedate,Declinedate, BranchName) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'''
-            
-            cursor.execute(insert_query, (ticket, "Declined", ntequote, 1, insert_date, "1900-01-01 00:00:00.000", declined, branchname))
-            conn.commit()
-    
-    cursor.execute(select_query, (ticket,))
-    dataset = cursor.fetchall()
-    cursor.close()
-    conn.close()
+# getPartsPrice(partInfoDf)
