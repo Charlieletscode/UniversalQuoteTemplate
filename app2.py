@@ -36,6 +36,7 @@ from decimal import Decimal
 from reportlab.pdfbase.pdfmetrics import registerFont
 from reportlab.pdfbase.ttfonts import TTFont
 registerFont(TTFont('Arial','arial.ttf'))
+# trytest
 
 current_date = datetime.now()
 formatted_date = current_date.strftime("%m/%d/%Y")
