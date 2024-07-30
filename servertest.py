@@ -8,9 +8,34 @@ database = os.environ.get("databaseGFT")
 username = os.environ.get("usernameGFT")
 password = os.environ.get("passwordGFT")
 SQLaddress = os.environ.get("addressGFT")
+cryptToken = os.environ.get("cryptToken")
 
 # parameter_value = "230524-0173"
-# latest param240501-0445
+# latest param 240501-0445
+
+# params on 7/30 CircleKkeyBasic, databaseGFT, fmDashtoken1, fmDashtoken2
+def getToken(custnmbr):
+    conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
+    query = f"""
+    DECLARE @KEY NVARCHAR(255) = '{cryptToken}';
+    SELECT 
+        CUSTNMBR,
+        CAST(DECRYPTBYPASSPHRASE(@KEY, Token_Value) AS NVARCHAR(255)) AS Decrypted_Token_Value
+    FROM [dbo].[MR_Token_Table];
+    """
+
+    conn = pyodbc.connect(conn_str)
+    cursor = conn.cursor()
+
+    cursor.execute(query)
+
+    results = cursor.fetchall()
+    columns = [column[0] for column in cursor.description]
+    tokenDf = pd.DataFrame.from_records(results, columns=columns)
+
+    cursor.close()
+    conn.close()
+    return tokenDf
 
 def getBinddes(input):
     
@@ -52,7 +77,10 @@ def getPartsPrice(partInfoDf):
                 'ITEMDESC': result[0][1],
                 'SellingPrice': result[0][2]
             }
-        pricingDf = pricingDf.append(row_dict, ignore_index=True)
+        
+        row_df = pd.DataFrame([row_dict])
+        pricingDf = pd.concat([pricingDf, row_df], ignore_index=True)
+        # pricingDf = pricingDf.append(row_dict, ignore_index=True)
     
     cursor.close()
     conn.close()
@@ -332,6 +360,7 @@ def getParent(branchName):
     parentDf['NTE_QUOTE'] = parentDf['NTE_QUOTE'].replace(mapping)
     conn.close()
     return parentDf
+# •	Ability to attach PDF to ticket in GP (open to discussion My suggestion is to also store it in parent table)
 def updateParent(ticket, editable, ntequote, savetime, approved, declined, branchname, button):
     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
     conn = pyodbc.connect(conn_str)

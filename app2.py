@@ -105,6 +105,7 @@ def mainPage():
         st.session_state.labor_df = pd.DataFrame()
         st.session_state.trip_charge_df = pd.DataFrame()
         st.session_state.parts_df = pd.DataFrame()
+        st.session_state.temp_parts_df = pd.DataFrame()
         st.session_state.miscellaneous_charges_df = pd.DataFrame()
         st.session_state.materials_non_stock_and_rentals_df = pd.DataFrame()
         st.session_state.subcontractor_df = pd.DataFrame()
@@ -202,6 +203,7 @@ def mainPage():
 
             if st.session_state.get("materials_non_stock_and_rentals_df", None) is None or st.session_state.materials_non_stock_and_rentals_df.empty:
                 materials_rentals_data = {
+                    'Incurred/Proposed': [None],
                     'Description': [None],
                     'QTY': [None],
                     'UNIT Price': [None],
@@ -245,7 +247,7 @@ def mainPage():
                             st.session_state.input_letters = st.text_input("First enter Part Id or Parts Desc:", max_chars=15).upper()
                             if st.session_state.input_letters != st.session_state.prev_input_letters and len(st.session_state.input_letters) > 0:
                                 st.session_state.pricingDf = getBinddes(st.session_state.input_letters)
-                                st.session_state.prev_input_letters = st.session_state.input_letters
+                                st.session_state.prev_input_letters = st.session_state.input_letters                                
                         width = 700
                         inwidth = 500
                         if category == 'Labor':
@@ -519,11 +521,13 @@ def mainPage():
                                         newTripdf = newTripdf[incurred_mask & qty_mask & desc_mask]
                                         rate_mask = newTripdf['UNIT Price'].isnull()
                                         newTripdf.loc[rate_mask, 'UNIT Price'] = newTripdf.loc[rate_mask, 'Description'].apply(lambda x: re.search(r'(\d+(\.\d+)?)', x).group() if re.search(r'(\d+(\.\.\d+)?)', x) else 0)
-                                        unit_mask = newTripdf['UNIT Price'].isnull()
+                                        newTripdf['UNIT Price'] = pd.to_numeric(newTripdf['UNIT Price'], errors='coerce')
                                         if newTripdf['EXTENDED'].isnull().any():
                                             extended_mask = newTripdf['EXTENDED'].isnull()
                                             newTripdf.loc[extended_mask, 'EXTENDED'] = newTripdf.loc[extended_mask, 'UNIT Price'] * qty_values
                                         st.session_state.trip_charge_df = pd.concat([st.session_state.trip_charge_df, newTripdf], ignore_index=True)
+
+                                        category_totals[category] = st.session_state.trip_charge_df['EXTENDED'].sum()
                                         st.experimental_rerun()
                                     col1.write("<small>Please enter Unit Price if 0</small>", unsafe_allow_html=True)
                             if not st.session_state.trip_charge_df.empty:
@@ -581,16 +585,19 @@ def mainPage():
                             if st.session_state.pricingDf is None or st.session_state.pricingDf.empty:
                                 st.error("Please enter a valid Part Id or Part Desc.")
                             else:
-                                with st.form(key='parts_form', clear_on_submit=True):
-                                    st.write("New Parts")
-                                    parts_data = {
-                                        'Incurred/Proposed': [None],
-                                        'Description': [None],
-                                        'QTY': [None],
-                                        'UNIT Price': [None],
-                                        'EXTENDED': [None],
-                                    }
-                                    newParts_df = pd.DataFrame(parts_data)
+                                with st.form(key='parts_form'):
+                                    if(st.session_state.temp_parts_df.empty):
+                                        st.write("New Parts")
+                                        parts_data = {
+                                            'Incurred/Proposed': [None],
+                                            'Description': [None],
+                                            'QTY': [None],
+                                            'UNIT Price': [None],
+                                            'EXTENDED': [None],
+                                        }
+                                        newParts_df = pd.DataFrame(parts_data)
+                                    else:
+                                        newParts_df = pd.DataFrame(st.session_state.temp_parts_df)
                                     if len(st.session_state.input_letters) > 0:
                                         filtered_descriptions = st.session_state.pricingDf[(st.session_state.pricingDf['ITEMNMBR'] + " : " + st.session_state.pricingDf['ITEMDESC']).str.contains(st.session_state.input_letters)]
                                         filtered_descriptions['bindDes'] = filtered_descriptions['ITEMNMBR'] + " : " + filtered_descriptions['ITEMDESC']
@@ -686,27 +693,28 @@ def mainPage():
                                     col1, col2 = st.columns([3, 1])
                                     submit_button = col2.form_submit_button(label='Submit')
                                 if not newParts_df.empty:
-                                    if submit_button and len(st.session_state.input_letters) > 0:
-                                        qty_mask = newParts_df['QTY'].notnull()
-                                        desc_mask = newParts_df['Description'].notnull()
-                                        qty_values = newParts_df.loc[qty_mask, 'QTY']
-                                        descriptions = newParts_df.loc[desc_mask,'Description']
-                                        incurred_mask = newParts_df['Incurred/Proposed'].notnull()
-                                        newParts_df = newParts_df[incurred_mask & qty_mask & desc_mask]
-                                        mask = filtered_descriptions['bindDes'].isin(descriptions)
-                                        filtered_descriptions = filtered_descriptions[mask]
-                                        chosen_descriptions = filtered_descriptions[['bindDes', 'ITEMNMBR']].copy()
-                                        chosen_descriptions = chosen_descriptions.dropna(subset=['bindDes'])
-                                        chosen_descriptions['Bill_Customer_Number'] = st.session_state.ticketDf['Bill_Customer_Number'].iloc[0]
-                                        partsPriceDf = getPartsPrice(chosen_descriptions)
-                                        selling_prices = pd.to_numeric(partsPriceDf['SellingPrice'], errors='coerce')
-                                        unit_mask = newParts_df['UNIT Price'].isnull()
-                                        newParts_df.loc[unit_mask, 'UNIT Price'] = selling_prices.values
-                                        if newParts_df['EXTENDED'].isnull().any():
-                                            extended_mask = newParts_df['EXTENDED'].isnull()
-                                            newParts_df.loc[extended_mask, 'EXTENDED'] = newParts_df.loc[extended_mask, 'UNIT Price'] * qty_values
-                                        st.session_state.parts_df = pd.concat([st.session_state.parts_df, newParts_df], ignore_index=True)
-                                        st.experimental_rerun()
+                                    qty_mask = newParts_df['QTY'].notnull()
+                                    desc_mask = newParts_df['Description'].notnull()
+                                    qty_values = newParts_df.loc[qty_mask, 'QTY']
+                                    descriptions = newParts_df.loc[desc_mask,'Description']
+                                    incurred_mask = newParts_df['Incurred/Proposed'].notnull()
+                                    newParts_df = newParts_df[incurred_mask & qty_mask & desc_mask]
+                                    mask = filtered_descriptions['bindDes'].isin(descriptions)
+                                    filtered_descriptions = filtered_descriptions[mask]
+                                    chosen_descriptions = filtered_descriptions[['bindDes', 'ITEMNMBR']].copy()
+                                    chosen_descriptions = chosen_descriptions.dropna(subset=['bindDes'])
+                                    chosen_descriptions['Bill_Customer_Number'] = st.session_state.ticketDf['Bill_Customer_Number'].iloc[0]
+                                    partsPriceDf = getPartsPrice(chosen_descriptions)
+                                    selling_prices = pd.to_numeric(partsPriceDf['SellingPrice'], errors='coerce')
+                                    unit_mask = newParts_df['UNIT Price'].isnull()
+                                    newParts_df.loc[unit_mask, 'UNIT Price'] = selling_prices.values
+                                    if newParts_df['EXTENDED'].isnull().any():
+                                        extended_mask = newParts_df['EXTENDED'].isnull()
+                                        newParts_df.loc[extended_mask, 'EXTENDED'] = newParts_df.loc[extended_mask, 'UNIT Price'] * qty_values
+                                    print(st.session_state.temp_parts_df, newParts_df)
+                                    st.session_state.temp_parts_df = pd.concat([st.session_state.temp_parts_df, newParts_df], ignore_index=True)
+                                    if submit_button:
+                                        st.session_state.parts_df = st.session_state.temp_parts_df
                             if not st.session_state.parts_df.empty:
                                 st.write("Archived Parts (Delete row when necessary please dont add rows)")
                                 tempParts_df = st.data_editor(
@@ -821,6 +829,12 @@ def mainPage():
                                 st.session_state.materials_non_stock_and_rentals_df = st.data_editor(
                                     st.session_state.materials_non_stock_and_rentals_df,
                                     column_config={
+                                        "Incurred/Proposed": st.column_config.SelectboxColumn(
+                                            "Incurred/Proposed",
+                                            help="Incurred",
+                                            width=inwidth/4,
+                                            options=["Incurred", "Proposed"]
+                                        ),
                                         "QTY": st.column_config.NumberColumn(
                                             "QTY",
                                             help="Quantity",
@@ -862,6 +876,7 @@ def mainPage():
                                     st.session_state.materials_non_stock_and_rentals_df.loc[extended_mask, 'EXTENDED'] = np.array(qty_values[extended_mask]) * np.array(unit_price_values[extended_mask])
                                     if st.session_state.get("materials_non_stock_and_rentals_df", None) is None or st.session_state.materials_non_stock_and_rentals_df.empty:
                                         materials_rentals_data = {
+                                            'Incurred/Proposed': [None],
                                             'Description': [None],
                                             'QTY': [None],
                                             'UNIT Price': [None],
