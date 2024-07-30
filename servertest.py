@@ -152,7 +152,7 @@ def getAllTicket(ticket):
     dataset = cursor.fetchall()
     data = [list(row) for row in dataset]
     ticketTripDf = pd.DataFrame(data, columns=["Incurred/Proposed", "Description", "QTY", "UNIT Price", "EXTENDED"])
-
+    # print(ticketTripDf)
     select_query = "Exec CF_Univ_GetParts @TicketID = ?"
     cursor.execute(select_query, (ticket,))
     dataset = cursor.fetchall()
