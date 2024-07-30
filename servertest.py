@@ -165,11 +165,11 @@ def getAllTicket(ticket):
     data = [list(row) for row in dataset]
     ticketMiscDf = pd.DataFrame(data, columns=["Description", "QTY", "UNIT Price", "EXTENDED"])
 
-    select_query = "SELECT Description, QTY, CAST([UNIT_Price] AS FLOAT) AS [UNIT_Price], CAST(EXTENDED AS FLOAT) AS EXTENDED FROM [CF_Universal_materials_rentals_insert] WHERE TicketID = ?"
+    select_query = "SELECT Incurred, Description, QTY, CAST([UNIT_Price] AS FLOAT) AS [UNIT_Price], CAST(EXTENDED AS FLOAT) AS EXTENDED FROM [CF_Universal_materials_rentals_insert] WHERE TicketID = ?"
     cursor.execute(select_query, (ticket,))
     dataset = cursor.fetchall()
     data = [list(row) for row in dataset]
-    ticketMaterialsDf = pd.DataFrame(data, columns=["Description", "QTY", "UNIT Price", "EXTENDED"])
+    ticketMaterialsDf = pd.DataFrame(data, columns=["Incurred/Proposed", "Description", "QTY", "UNIT Price", "EXTENDED"])
 
     select_query = "SELECT Description, QTY, CAST([UNIT_Price] AS FLOAT) AS [UNIT_Price], CAST(EXTENDED AS FLOAT) AS EXTENDED FROM [CF_Universal_subcontractor_insert] WHERE TicketID = ?"
     cursor.execute(select_query, (ticket,))
@@ -250,9 +250,9 @@ def updateAll(ticket, incurred, proposed, laborDf,  tripDf, partsDf, miscDf, mat
     cursor.execute(delete_query, (ticket,))
     conn.commit()
     materialDf = materialDf.dropna()
-    data = materialDf[["Description", "QTY", "UNIT Price", "EXTENDED"]].values.tolist()
+    data = materialDf[["Incurred/Proposed", "Description", "QTY", "UNIT Price", "EXTENDED"]].values.tolist()
     data = [row + [ticket] for row in data if all(x is not None for x in row)]
-    insert_query = "INSERT INTO [CF_Universal_materials_rentals_insert] (Description, QTY, UNIT_Price, EXTENDED, TicketID) VALUES (?,?,?,?,?)"
+    insert_query = "INSERT INTO [CF_Universal_materials_rentals_insert] (Incurred, Description, QTY, UNIT_Price, EXTENDED, TicketID) VALUES (?,?,?,?,?,?)"
     if data:
         cursor.executemany(insert_query, data)
     conn.commit()
