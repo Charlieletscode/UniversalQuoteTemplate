@@ -2,12 +2,13 @@ import streamlit as st
 import pandas as pd
 import requests
 from PIL import Image
+from streamlit_float import *
 import io
 import base64
 import random
+from streamlit.components.v1 import html
 import time
 from io import BytesIO
-from __init__ import *
 from reportlab.lib.pagesizes import letter
 from servertest import getAllPrice
 from servertest import updateAll
@@ -30,7 +31,7 @@ import re
 from api.fmDash import submitFmQuotes
 from api.fmDash import checkout
 from api.verisae import submitQuoteVerisae
-from api.circleK import circleK_wo_cost_information
+from api.circleK import wo_cost_information
 from reportlab.graphics.renderPM import PMCanvas
 from decimal import Decimal
 from reportlab.pdfbase.pdfmetrics import registerFont
@@ -73,8 +74,6 @@ if "parentDf" not in st.session_state:
     st.session_state.parentDf = getBranch()
 if 'expand_collapse_state' not in st.session_state:
     st.session_state.expand_collapse_state = False
-if 'prev_input_letters' not in st.session_state:
-    st.session_state.prev_input_letters = ""
 # if 'filtered_ticket' not in st.session_state:
 #     st.session_state.filtered_ticket = [event for event in st.session_state.filtered_ticket if event['BranchShortName'] in st.session_state.selected_branches]
 
@@ -105,7 +104,6 @@ def mainPage():
         st.session_state.labor_df = pd.DataFrame()
         st.session_state.trip_charge_df = pd.DataFrame()
         st.session_state.parts_df = pd.DataFrame()
-        st.session_state.temp_parts_df = pd.DataFrame()
         st.session_state.miscellaneous_charges_df = pd.DataFrame()
         st.session_state.materials_non_stock_and_rentals_df = pd.DataFrame()
         st.session_state.subcontractor_df = pd.DataFrame()
@@ -119,7 +117,7 @@ def mainPage():
     if 'ticketN' in st.session_state and st.session_state.ticketN:
         if st.session_state.ticketDf is None:
             # st.session_state.refresh_button = False
-            st.session_state.ticketDf, st.session_state.LRatesDf, st.session_state.TRatesDf, st.session_state.misc_ops_df = getAllPrice(st.session_state.ticketN)
+            st.session_state.ticketDf, st.session_state.LRatesDf, st.session_state.TRatesDf, st.session_state.misc_ops_df= getAllPrice(st.session_state.ticketN)
             workDes = getDesc(ticket=st.session_state.ticketN)
             if workDes is None or workDes.empty:
                 st.session_state.workDescription = "Please input"
@@ -203,7 +201,6 @@ def mainPage():
 
             if st.session_state.get("materials_non_stock_and_rentals_df", None) is None or st.session_state.materials_non_stock_and_rentals_df.empty:
                 materials_rentals_data = {
-                    'Incurred/Proposed': [None],
                     'Description': [None],
                     'QTY': [None],
                     'UNIT Price': [None],
@@ -242,10 +239,17 @@ def mainPage():
 
                 for category in categories:
                     with st.expander(f"******{category}******", expanded=True):
-                        st.title(category)                          
-                        width = 700
+                        st.title(category)
+                        if category == 'Parts':
+                            prev_input_letters = ""
+                            st.session_state.input_letters = st.text_input("First enter Part Id or Parts Desc:", max_chars=15).upper()
+                            if st.session_state.input_letters != prev_input_letters and len(st.session_state.input_letters) > 0:
+                                st.session_state.pricingDf = getBinddes(st.session_state.input_letters)
+                                prev_input_letters = st.session_state.input_letters
+                        width = 800
                         inwidth = 500
                         if category == 'Labor':
+                            category_total = 0
                             labor_data = {
                                 'Incurred/Proposed': [None],
                                 'Description': [None],
@@ -329,84 +333,85 @@ def mainPage():
                                         newLabordf.loc[qty_mask, 'QTY'] = np.array(qty_values[qty_mask]) * np.array(hours_values[qty_mask])
                                         description_values = newLabordf['Description']
                                         rate_mask = description_values.notnull()
-                                        newLabordf.loc[rate_mask, 'Hourly Rate'] = description_values[rate_mask].apply(lambda x: re.search(r'(\d+(\.\d+)?)', x).group() if re.search(r'(\d+(\.\.\d+)?)', x) else 0)
+                                        newLabordf.loc[rate_mask, 'Hourly Rate'] = description_values[rate_mask].apply(lambda x: float(re.search(r'(\d+(\.\d+)?)', x).group()))
                                         extended_mask = qty_mask & rate_mask
-                                        qty_values = pd.to_numeric(newLabordf.loc[qty_mask, 'QTY'], errors='coerce')
-                                        hourly = pd.to_numeric(newLabordf.loc[rate_mask, 'Hourly Rate'], errors='coerce')
+                                        qty_values = np.array(newLabordf.loc[qty_mask, 'QTY'], dtype=float)
+                                        hourly = np.array(newLabordf.loc[rate_mask, 'Hourly Rate'], dtype=float)
                                         rounded_extended_values = np.round(np.array(qty_values) * np.array(hourly), 2)
                                         newLabordf.loc[extended_mask, 'EXTENDED'] = rounded_extended_values
                                         newLabordf = newLabordf.dropna()
                                         st.session_state.labor_df = pd.concat([st.session_state.labor_df, newLabordf], ignore_index=True)
+                                        st.empty()
                                         st.experimental_rerun()
-                            if not st.session_state.labor_df.empty:
-                                st.write("Archived Labor (Delete row when necessary please dont add rows)")
-                                tempLabor_df = st.data_editor(
-                                    st.session_state.labor_df,
-                                    column_config={
-                                        "Incurred/Proposed": st.column_config.SelectboxColumn(
-                                            "Incurred/Proposed",
-                                            help="Incurred",
-                                            width=inwidth/6,
-                                            disabled=True,
-                                            options=["Incurred", "Proposed"],
-                                        ),
-                                        "Description": st.column_config.SelectboxColumn(
-                                            "Description",
-                                            help="Description",
-                                            width=inwidth/6,
-                                            disabled=True,
-                                            options=concatenated_values
-                                        ),
-                                        "Nums of Techs": st.column_config.NumberColumn(
-                                            "Nums of Techs",
-                                            help="Nums of Techs",
-                                            width=inwidth/6,
-                                            min_value=1,
-                                            disabled=True,
-                                            step=1
-                                        ),
-                                        "Hours per Tech": st.column_config.NumberColumn(
-                                            "Hours per Tech",
-                                            help="Hours per Tech",
-                                            width=inwidth/6,
-                                            min_value=0.00,
-                                            disabled=True,
-                                            step = 0.25
-                                        ),
-                                        "QTY": st.column_config.NumberColumn(
-                                            "QTY",
-                                            help="Quantity",
-                                            width=inwidth/6,
-                                            min_value=0.00,
-                                            step = 0.25,
-                                            disabled=True,
-                                        ),
-                                        "Hourly Rate": st.column_config.NumberColumn(
-                                            "Hourly Rate",
-                                            help="Hourly Rate",
-                                            width=inwidth/6,
-                                            min_value=0.00,
-                                            disabled=True,
-                                        ),
-                                        "EXTENDED": st.column_config.NumberColumn(
-                                            "EXTENDED",
-                                            help="Extended Amount",
-                                            width=inwidth/6,
-                                            disabled=True,
-                                            min_value=0.00,
-                                            format="%.2f"
-                                        ),
-                                    },
-                                    hide_index=True,
-                                    width=width,
-                                    num_rows="dynamic",
-                                    key=category
-                                )
-                                category_totals[category] = st.session_state.labor_df['EXTENDED'].sum()
-                                if not tempLabor_df.equals(st.session_state.labor_df):
-                                    st.session_state.labor_df = pd.DataFrame(tempLabor_df)
-                                    st.experimental_rerun()
+                                    category_totals[category] = newLabordf['EXTENDED'].sum() + category_total
+                                    st.session_state.labor_df.dropna(how='all', inplace=True)
+                                if not st.session_state.labor_df.empty:
+                                    st.write("Archived Labor (Delete row when necessary please dont add rows)")
+                                    st.session_state.labor_df = st.data_editor(
+                                        st.session_state.labor_df,
+                                        column_config={
+                                            "Incurred/Proposed": st.column_config.SelectboxColumn(
+                                                "Incurred/Proposed",
+                                                help="Incurred",
+                                                width=inwidth/6,
+                                                disabled=True,
+                                                options=["Incurred", "Proposed"],
+                                            ),
+                                            "Description": st.column_config.SelectboxColumn(
+                                                "Description",
+                                                help="Description",
+                                                width=inwidth/6,
+                                                disabled=True,
+                                                options=concatenated_values
+                                            ),
+                                            "Nums of Techs": st.column_config.NumberColumn(
+                                                "Nums of Techs",
+                                                help="Nums of Techs",
+                                                width=inwidth/6,
+                                                min_value=1,
+                                                disabled=True,
+                                                step=1
+                                            ),
+                                            "Hours per Tech": st.column_config.NumberColumn(
+                                                "Hours per Tech",
+                                                help="Hours per Tech",
+                                                width=inwidth/6,
+                                                min_value=0.00,
+                                                disabled=True,
+                                                step = 0.25
+                                            ),
+                                            "QTY": st.column_config.NumberColumn(
+                                                "QTY",
+                                                help="Quantity",
+                                                width=inwidth/6,
+                                                min_value=0.00,
+                                                step = 0.25,
+                                                disabled=True,
+                                            ),
+                                            "Hourly Rate": st.column_config.NumberColumn(
+                                                "Hourly Rate",
+                                                help="Hourly Rate",
+                                                width=inwidth/6,
+                                                min_value=0.00,
+                                                disabled=True,
+                                            ),
+                                            "EXTENDED": st.column_config.NumberColumn(
+                                                "EXTENDED",
+                                                help="Extended Amount",
+                                                width=inwidth/6,
+                                                disabled=True,
+                                                min_value=0.00,
+                                                format="%.2f"
+                                            ),
+                                        },
+                                        hide_index=True,
+                                        width=width,
+                                        num_rows="dynamic",
+                                        key=category
+                                    )
+                                    category_total = st.session_state.labor_df['EXTENDED'].sum()
                         elif category == 'Trip Charge':
+                            category_total = 0
                             string_values = [" : "+str(value).rstrip('0').rstrip('.') for value in st.session_state.TRatesDf['Billing_Amount']]
                             concatenated_values = [description + value for description, value in zip(st.session_state.TRatesDf['Pay_Code_Description'], string_values)]
                             # new
@@ -508,139 +513,92 @@ def mainPage():
                                 submit_button = col2.form_submit_button(label='Submit')
                                 if not newTripdf.empty:
                                     if submit_button:
-                                        qty_mask = newTripdf['QTY'].notnull()
                                         desc_mask = newTripdf['Description'].notnull()
-                                        qty_values = newTripdf.loc[qty_mask, 'QTY']
-                                        descriptions = newTripdf.loc[desc_mask,'Description']
+                                        qty_mask = newTripdf["QTY"].notnull()
+                                        qty_values = newTripdf.loc[qty_mask,"QTY"]
+                                        description_values = newTripdf.loc[desc_mask,"Description"]
                                         incurred_mask = newTripdf['Incurred/Proposed'].notnull()
+                                        rate_mask = desc_mask & newTripdf['UNIT Price'].isnull() 
                                         newTripdf = newTripdf[incurred_mask & qty_mask & desc_mask]
-                                        rate_mask = newTripdf['UNIT Price'].isnull()
-                                        newTripdf.loc[rate_mask, 'UNIT Price'] = newTripdf.loc[rate_mask, 'Description'].apply(lambda x: re.search(r'(\d+(\.\d+)?)', x).group() if re.search(r'(\d+(\.\.\d+)?)', x) else 0)
-                                        newTripdf['UNIT Price'] = pd.to_numeric(newTripdf['UNIT Price'], errors='coerce')
-                                        if newTripdf['EXTENDED'].isnull().any():
-                                            extended_mask = newTripdf['EXTENDED'].isnull()
-                                            newTripdf.loc[extended_mask, 'EXTENDED'] = newTripdf.loc[extended_mask, 'UNIT Price'] * qty_values
+                                        newTripdf.loc[rate_mask, 'UNIT Price'] = description_values[rate_mask].apply(lambda x: float(re.search(r'(\d+(\.\d+)?)', x).group()))
+                                        rate_mask = newTripdf['UNIT Price'].notnull()
+                                        extended_mask = qty_mask & rate_mask
+                                        qty_values = np.array(newTripdf.loc[rate_mask, 'QTY'], dtype=float)
+                                        unitPrice = np.array(newTripdf.loc[rate_mask, 'UNIT Price'], dtype=float)
+                                        extended_values = np.array(qty_values) * np.array(unitPrice)
+                                        rounded_extended_values = np.round(extended_values, 2)
+                                        newTripdf.loc[extended_mask, 'EXTENDED'] = rounded_extended_values
+                                        newTripdf = newTripdf.dropna()
                                         st.session_state.trip_charge_df = pd.concat([st.session_state.trip_charge_df, newTripdf], ignore_index=True)
-
-                                        category_totals[category] = st.session_state.trip_charge_df['EXTENDED'].sum()
                                         st.experimental_rerun()
+                                    category_totals[category] = newTripdf['EXTENDED'].sum() + category_total
                                     col1.write("<small>Please enter Unit Price if 0</small>", unsafe_allow_html=True)
-                            if not st.session_state.trip_charge_df.empty:
-                                st.write("Archived Trip/Travel Charge (Delete row when necessary please dont add rows)")
-                                tempTripDf = st.data_editor(
-                                    st.session_state.trip_charge_df,
-                                    column_config={
-                                        "Incurred/Proposed": st.column_config.SelectboxColumn(
-                                            "Incurred/Proposed",
-                                            help="Incurred",
-                                            width=inwidth/6,
-                                            options=["Incurred", "Proposed"],
-                                            disabled=True
-                                        ),"QTY": st.column_config.NumberColumn(
-                                            "QTY",
-                                            help="Quantity",
-                                            width=inwidth/6,
-                                            min_value=0,
-                                            disabled=True
-                                        ),
-                                        "Description": st.column_config.SelectboxColumn(
-                                            "Description",
-                                            help="Description",
-                                            width=inwidth/4,
-                                            options=concatenated_values,
-                                            disabled=True
-                                        ),
-                                        "UNIT Price": st.column_config.NumberColumn(
-                                            "UNIT Price",
-                                            help="Unit Price",
-                                            width=inwidth/4,
-                                            min_value=0.00,
-                                            disabled=True
-                                        ),
-                                        "EXTENDED": st.column_config.NumberColumn(
-                                            "EXTENDED",
-                                            help="Extended Amount",
-                                            width=inwidth/4,
-                                            min_value=0.00,
-                                            format="%.2f",
-                                            disabled=True
-                                        )
-                                    },
-                                    hide_index=True,
-                                    width=width,
-                                    num_rows="dynamic",
-                                    key=category
-                                )
-                                category_totals[category] = st.session_state.trip_charge_df['EXTENDED'].sum()
-                                if not tempTripDf.equals(st.session_state.trip_charge_df):
-                                    st.session_state.trip_charge_df = pd.DataFrame(tempTripDf)
-                                    st.experimental_rerun()
+                                if not st.session_state.trip_charge_df.empty:
+                                    st.write("Archived Trip/Travel Charge (Delete row when necessary please dont add rows)")
+                                    st.session_state.trip_charge_df = st.data_editor(
+                                        st.session_state.trip_charge_df,
+                                        column_config={
+                                            "Incurred/Proposed": st.column_config.SelectboxColumn(
+                                                "Incurred/Proposed",
+                                                help="Incurred",
+                                                width=inwidth/6,
+                                                options=["Incurred", "Proposed"],
+                                                disabled=True
+                                            ),"QTY": st.column_config.NumberColumn(
+                                                "QTY",
+                                                help="Quantity",
+                                                width=inwidth/6,
+                                                min_value=0,
+                                                disabled=True
+                                            ),
+                                            "Description": st.column_config.SelectboxColumn(
+                                                "Description",
+                                                help="Description",
+                                                width=inwidth/4,
+                                                options=concatenated_values,
+                                                disabled=True
+                                            ),
+                                            "UNIT Price": st.column_config.NumberColumn(
+                                                "UNIT Price",
+                                                help="Unit Price",
+                                                width=inwidth/4,
+                                                min_value=0.00,
+                                                disabled=True
+                                            ),
+                                            "EXTENDED": st.column_config.NumberColumn(
+                                                "EXTENDED",
+                                                help="Extended Amount",
+                                                width=inwidth/4,
+                                                min_value=0.00,
+                                                format="%.2f",
+                                                disabled=True
+                                            )
+                                        },
+                                        hide_index=True,
+                                        width=width,
+                                        num_rows="dynamic",
+                                        key=category
+                                    )
+                                    category_total = st.session_state.trip_charge_df['EXTENDED'].sum()
                         elif category == 'Parts':
-                            st.session_state.input_letters = st.text_input("First enter Part Id or Parts Desc:", max_chars=15).upper()
-                            if st.session_state.input_letters != st.session_state.prev_input_letters and len(st.session_state.input_letters) > 0:
-                                st.session_state.pricingDf = getBinddes(st.session_state.input_letters)
-                                st.session_state.prev_input_letters = st.session_state.input_letters
-                            if st.session_state.pricingDf is None or st.session_state.pricingDf.empty:
-                                st.error("Please enter a valid Part Id or Part Desc.")
-                            else:
-                                with st.form(key='parts_form', clear_on_submit=True):
-                                    st.write("New Parts")
-                                    parts_data = {
-                                        'Incurred/Proposed': [None],
-                                        'Description': [None],
-                                        'QTY': [None],
-                                        'UNIT Price': [None],
-                                        'EXTENDED': [None],
-                                    }
-                                    newParts_df = pd.DataFrame(parts_data)
-                                    if len(st.session_state.input_letters) > 0:
-                                        filtered_descriptions = st.session_state.pricingDf[(st.session_state.pricingDf['ITEMNMBR'] + " : " + st.session_state.pricingDf['ITEMDESC']).str.contains(st.session_state.input_letters)]
-                                        filtered_descriptions['bindDes'] = filtered_descriptions['ITEMNMBR'] + " : " + filtered_descriptions['ITEMDESC']
-                                        newParts_df = st.data_editor(
-                                            newParts_df,
-                                            column_config={
-                                                "QTY": st.column_config.NumberColumn(
-                                                    "QTY",
-                                                    help="Quantity",
-                                                    width=inwidth/4,
-                                                    min_value=0,
-                                                    
-                                                ),
-                                                "Description": st.column_config.SelectboxColumn(
-                                                    "Description",
-                                                    help="Description",
-                                                    width=inwidth/4,
-                                                    options=filtered_descriptions['bindDes'],
-                                                ),
-                                                "Incurred/Proposed": st.column_config.SelectboxColumn(
-                                                    "Incurred/Proposed",
-                                                    help="Incurred",
-                                                    width=inwidth/6,
-                                                    options=["Incurred", "Proposed"]
-                                                ),
-                                                "UNIT Price": st.column_config.NumberColumn(
-                                                    "UNIT Price",
-                                                    help="Unit Price",
-                                                    width=inwidth/4,
-                                                    min_value=0.00,
-                                                    disabled=True
-                                                ),
-                                                "EXTENDED": st.column_config.NumberColumn(
-                                                    "EXTENDED",
-                                                    help="Extended Amount",
-                                                    width=inwidth/4,
-                                                    min_value=0.00,
-                                                    format="%.2f",
-                                                    disabled=True
-                                                )
-                                            },
-                                            hide_index=True,
-                                            width=width,
-                                            num_rows="dynamic",
-                                            key=category+"df"
-                                        )
-                                    else:
-                                        newParts_df = st.data_editor(
+                            category_total = 0
+                            # new
+                            with st.form(key='parts_form', clear_on_submit=True):
+                                col1, col2 = st.columns([3, 3])
+                                col1.write("New Parts")
+                                col2.warning("add new Parts after searching parts above")
+                                parts_data = {
+                                    'Incurred/Proposed': [None],
+                                    'Description': [None],
+                                    'QTY': [None],
+                                    'UNIT Price': [None],
+                                    'EXTENDED': [None],
+                                }
+                                newParts_df = pd.DataFrame(parts_data)
+                                if len(st.session_state.input_letters) > 0:
+                                    filtered_descriptions = st.session_state.pricingDf[(st.session_state.pricingDf['ITEMNMBR'] + " : " + st.session_state.pricingDf['ITEMDESC']).str.contains(st.session_state.input_letters)]
+                                    filtered_descriptions['bindDes'] = filtered_descriptions['ITEMNMBR'] + " : " + filtered_descriptions['ITEMDESC']
+                                    newParts_df = st.data_editor(
                                         newParts_df,
                                         column_config={
                                             "QTY": st.column_config.NumberColumn(
@@ -648,21 +606,19 @@ def mainPage():
                                                 help="Quantity",
                                                 width=inwidth/4,
                                                 min_value=0,
-                                                disabled=True                                            
+                                                
                                             ),
                                             "Description": st.column_config.SelectboxColumn(
                                                 "Description",
                                                 help="Description",
                                                 width=inwidth/4,
-                                                options=["please input something"],
-                                                disabled=True
+                                                options=filtered_descriptions['bindDes'],
                                             ),
                                             "Incurred/Proposed": st.column_config.SelectboxColumn(
                                                 "Incurred/Proposed",
                                                 help="Incurred",
                                                 width=inwidth/6,
-                                                options=["Incurred", "Proposed"],
-                                                disabled=True
+                                                options=["Incurred", "Proposed"]
                                             ),
                                             "UNIT Price": st.column_config.NumberColumn(
                                                 "UNIT Price",
@@ -685,8 +641,54 @@ def mainPage():
                                         num_rows="dynamic",
                                         key=category+"df"
                                     )
-                                    col1, col2 = st.columns([3, 1])
-                                    submit_button = col2.form_submit_button(label='Submit')
+                                else:
+                                    newParts_df = st.data_editor(
+                                    newParts_df,
+                                    column_config={
+                                        "QTY": st.column_config.NumberColumn(
+                                            "QTY",
+                                            help="Quantity",
+                                            width=inwidth/4,
+                                            min_value=0,
+                                            disabled=True                                            
+                                        ),
+                                        "Description": st.column_config.SelectboxColumn(
+                                            "Description",
+                                            help="Description",
+                                            width=inwidth/4,
+                                            options=["please input something"],
+                                            disabled=True
+                                        ),
+                                        "Incurred/Proposed": st.column_config.SelectboxColumn(
+                                            "Incurred/Proposed",
+                                            help="Incurred",
+                                            width=inwidth/6,
+                                            options=["Incurred", "Proposed"],
+                                            disabled=True
+                                        ),
+                                        "UNIT Price": st.column_config.NumberColumn(
+                                            "UNIT Price",
+                                            help="Unit Price",
+                                            width=inwidth/4,
+                                            min_value=0.00,
+                                            disabled=True
+                                        ),
+                                        "EXTENDED": st.column_config.NumberColumn(
+                                            "EXTENDED",
+                                            help="Extended Amount",
+                                            width=inwidth/4,
+                                            min_value=0.00,
+                                            format="%.2f",
+                                            disabled=True
+                                        )
+                                    },
+                                    hide_index=True,
+                                    width=width,
+                                    num_rows="dynamic",
+                                    key=category+"df"
+                                )
+                                col1, col2 = st.columns([3, 1])
+                                submit_button = col2.form_submit_button(label='Submit')
                                 if not newParts_df.empty:
                                     if submit_button and len(st.session_state.input_letters) > 0:
                                         qty_mask = newParts_df['QTY'].notnull()
@@ -701,7 +703,7 @@ def mainPage():
                                         chosen_descriptions = chosen_descriptions.dropna(subset=['bindDes'])
                                         chosen_descriptions['Bill_Customer_Number'] = st.session_state.ticketDf['Bill_Customer_Number'].iloc[0]
                                         partsPriceDf = getPartsPrice(chosen_descriptions)
-                                        selling_prices = pd.to_numeric(partsPriceDf['SellingPrice'], errors='coerce')
+                                        selling_prices = partsPriceDf['SellingPrice'].astype(float)
                                         unit_mask = newParts_df['UNIT Price'].isnull()
                                         newParts_df.loc[unit_mask, 'UNIT Price'] = selling_prices.values
                                         if newParts_df['EXTENDED'].isnull().any():
@@ -709,9 +711,11 @@ def mainPage():
                                             newParts_df.loc[extended_mask, 'EXTENDED'] = newParts_df.loc[extended_mask, 'UNIT Price'] * qty_values
                                         st.session_state.parts_df = pd.concat([st.session_state.parts_df, newParts_df], ignore_index=True)
                                         st.experimental_rerun()
-                            if not st.session_state.parts_df.empty:
+                                category_total = category_total + newParts_df['EXTENDED'].sum()
+                                category_totals[category] = category_total
+                            if not st.session_state.trip_charge_df.empty:
                                 st.write("Archived Parts (Delete row when necessary please dont add rows)")
-                                tempParts_df = st.data_editor(
+                                st.session_state.parts_df = st.data_editor(
                                     st.session_state.parts_df,
                                     column_config={
                                         "Incurred/Proposed": st.column_config.SelectboxColumn(
@@ -756,10 +760,7 @@ def mainPage():
                                     num_rows="dynamic",
                                     key=category
                                 )
-                                category_totals[category] = st.session_state.parts_df['EXTENDED'].sum()
-                                if not tempParts_df.equals(st.session_state.parts_df):
-                                    st.session_state.parts_df = pd.DataFrame(tempParts_df)
-                                    st.experimental_rerun()
+                                category_total = st.session_state.parts_df['EXTENDED'].sum()
                         elif category == 'Miscellaneous Charges':
                             string_values = [" : "+f'{value:.2f}'.rstrip('0').rstrip('.') for value in st.session_state.misc_ops_df['Fee_Amount']]
                             concatenated_values = [description + value for description, value in zip(st.session_state.misc_ops_df['Fee_Charge_Type'], string_values)]
@@ -801,34 +802,22 @@ def mainPage():
                                 )                        
                                 col1, col2 = st.columns([3,1])
                                 submit_button = col2.form_submit_button(label='Submit')
-                                if submit_button:
+                                if not st.session_state.miscellaneous_charges_df.empty:
+                                    if submit_button:
                                         qty_values = st.session_state.miscellaneous_charges_df['QTY']
                                         mask = qty_values.notnull() & st.session_state.miscellaneous_charges_df['Description'].notnull()
-                                        st.session_state.miscellaneous_charges_df.loc[mask, 'UNIT Price'] = st.session_state.miscellaneous_charges_df.loc[mask,'Description'].apply(lambda x: re.search(r'(\d+(\.\d+)?)', x).group() if re.search(r'(\d+(\.\.\d+)?)', x) else 0)
+                                        st.session_state.miscellaneous_charges_df.loc[mask, 'UNIT Price'] = st.session_state.miscellaneous_charges_df.loc[mask,'Description'].apply(lambda x: float(re.search(r'(\d+(\.\d+)?)', x).group()))
                                         unit_price_values = st.session_state.miscellaneous_charges_df.loc[mask,'UNIT Price']
-                                        st.session_state.miscellaneous_charges_df.loc[mask, 'EXTENDED'] = pd.to_numeric(qty_values[mask], errors='coerce').values * pd.to_numeric(unit_price_values[mask], errors='coerce').values
-                                        if st.session_state.miscellaneous_charges_df.empty:
-                                            misc_charges_data = {
-                                                'Description': [None],
-                                                'QTY': [None],
-                                                'UNIT Price': [None],
-                                                'EXTENDED': [None]
-                                            }
-                                            st.session_state.miscellaneous_charges_df = pd.DataFrame(misc_charges_data)
+                                        st.session_state.miscellaneous_charges_df.loc[mask, 'EXTENDED'] = np.array(qty_values[mask], dtype=float) * np.array(unit_price_values[mask], dtype=float)
+                                        
                                         st.experimental_rerun()
-                                category_total = st.session_state.miscellaneous_charges_df['EXTENDED'].sum()
-                                category_totals[category] = category_total
+                                    category_total = st.session_state.miscellaneous_charges_df['EXTENDED'].sum()
+                                    category_totals[category] = category_total
                         elif category == 'Materials/Non Stock and Rentals':
                             with st.form(key=f'{category}_form'):
                                 st.session_state.materials_non_stock_and_rentals_df = st.data_editor(
                                     st.session_state.materials_non_stock_and_rentals_df,
                                     column_config={
-                                        "Incurred/Proposed": st.column_config.SelectboxColumn(
-                                            "Incurred/Proposed",
-                                            help="Incurred",
-                                            width=inwidth/4,
-                                            options=["Incurred", "Proposed"]
-                                        ),
                                         "QTY": st.column_config.NumberColumn(
                                             "QTY",
                                             help="Quantity",
@@ -863,25 +852,18 @@ def mainPage():
                                 )
                                 col1, col2 = st.columns([3,1])
                                 submit_button = col2.form_submit_button(label='Submit')
-                                if submit_button:
-                                    qty_values = st.session_state.materials_non_stock_and_rentals_df['QTY']
-                                    unit_price_values = st.session_state.materials_non_stock_and_rentals_df['UNIT Price']
-                                    extended_mask = qty_values.notnull() & unit_price_values.notnull()                                    
-                                    st.session_state.materials_non_stock_and_rentals_df.loc[extended_mask, 'EXTENDED'] = np.array(qty_values[extended_mask]) * np.array(unit_price_values[extended_mask])
-                                    if st.session_state.get("materials_non_stock_and_rentals_df", None) is None or st.session_state.materials_non_stock_and_rentals_df.empty:
-                                        materials_rentals_data = {
-                                            'Incurred/Proposed': [None],
-                                            'Description': [None],
-                                            'QTY': [None],
-                                            'UNIT Price': [None],
-                                            'EXTENDED': [None]
-                                        }
-                                        st.session_state.materials_non_stock_and_rentals_df = pd.DataFrame(materials_rentals_data)
-                                    st.experimental_rerun()
-                                category_total = st.session_state.materials_non_stock_and_rentals_df['EXTENDED'].sum()
-                                category_totals[category] = category_total
+                                if not st.session_state.materials_non_stock_and_rentals_df.empty:
+                                    if submit_button:
+                                        qty_values = st.session_state.materials_non_stock_and_rentals_df['QTY']
+                                        unit_price_values = st.session_state.materials_non_stock_and_rentals_df['UNIT Price']
+                                        extended_mask = qty_values.notnull() & unit_price_values.notnull()
+                                        st.session_state.materials_non_stock_and_rentals_df = st.session_state.materials_non_stock_and_rentals_df[extended_mask]
+                                        st.session_state.materials_non_stock_and_rentals_df.loc[extended_mask, 'EXTENDED'] = np.array(qty_values[extended_mask]) * np.array(unit_price_values[extended_mask])
+                                        st.experimental_rerun()
+                                    category_total = st.session_state.materials_non_stock_and_rentals_df['EXTENDED'].sum()
+                                    category_totals[category] = category_total
                         elif category == 'Subcontractor':
-                            with st.form(key='sub_form'):
+                            with st.form(key='sub_form', clear_on_submit=True):
                                 st.session_state.subcontractor_df = st.data_editor(
                                     st.session_state.subcontractor_df,
                                     column_config={
@@ -918,23 +900,16 @@ def mainPage():
                                 )
                                 col1, col2 = st.columns([3,1])
                                 submit_button = col2.form_submit_button(label='Submit')
-                                if submit_button:
-                                    qty_values = st.session_state.subcontractor_df['QTY']
-                                    unit_price_values = st.session_state.subcontractor_df['UNIT Price']
-                                    extended_mask = qty_values.notnull() & unit_price_values.notnull()
-                                    st.session_state.subcontractor_df.loc[extended_mask, 'EXTENDED'] = np.array(qty_values[extended_mask]) * np.array(unit_price_values[extended_mask])
-                                    if st.session_state.get("subcontractor_df", None) is None or st.session_state.subcontractor_df.empty:
-                                        subcontractor_data = {
-                                            'Description': [None],
-                                            'QTY': [None],
-                                            'UNIT Price': [None],
-                                            'EXTENDED': [None]
-                                        }
-                                        st.session_state.subcontractor_df = pd.DataFrame(subcontractor_data)
-                                    st.experimental_rerun()
-                                category_total = st.session_state.subcontractor_df['EXTENDED'].sum()
-                                category_totals[category] = category_total
-                        st.write(f"****{category} Total : {round(category_totals[category], 2)}****")
+                                if not st.session_state.subcontractor_df.empty:
+                                    if submit_button:
+                                        qty_values = st.session_state.subcontractor_df['QTY']
+                                        unit_price_values = st.session_state.subcontractor_df['UNIT Price']
+                                        extended_mask = qty_values.notnull() & unit_price_values.notnull()
+                                        st.session_state.subcontractor_df.loc[extended_mask, 'EXTENDED'] = np.array(qty_values[extended_mask]) * np.array(unit_price_values[extended_mask])
+                                        st.experimental_rerun()
+                                    category_total = st.session_state.subcontractor_df['EXTENDED'].sum()
+                                    category_totals[category] = category_total
+                    col1.write(f"****{category} Total : {round(category_totals[category], 2)}****")
             else:
                 with st.expander("Work Description", expanded=False):
                     with st.container():
@@ -956,24 +931,19 @@ def mainPage():
                 </style>
                 """
                 st.markdown(expander_css, unsafe_allow_html=True)
-                desired_width = 180
+                desired_width = 130
                 for category in categories:
                     table_df = getattr(st.session_state, f"{category.lower().replace(' ', '_').replace('/', '_')}_df")
                     if not table_df.empty and 'EXTENDED' in table_df.columns:
-                        table_df['EXTENDED'] = pd.to_numeric(table_df['EXTENDED'], errors='coerce')
                         category_total = table_df['EXTENDED'].sum()
-                        category_total = round(category_total,2)
                         category_totals[category] = category_total
                         current_title = f"{category} Total: ${category_totals[category]}"
-                        # num_spaces = desired_width - len(current_title) - 3
-                        num_spaces = 1
-                        expanderTitle = f"{category}{'&nbsp;' * num_spaces}Total : ${category_totals[category]}"
-                        # print(current_title, len(current_title), num_spaces, len(current_title) + num_spaces)
-                        # print(expanderTitle)
+                        num_spaces = desired_width - len(current_title)
+                        expanderTitle = f"{category}{' &nbsp;' * num_spaces}Total: ${category_totals[category]}"
                     else:
                         current_title = f"{category} Total : $0"
                         num_spaces = desired_width - len(current_title)
-                        expanderTitle = f"{category}{'&nbsp;' * num_spaces}Total: $0"
+                        expanderTitle = f"{category}{' &nbsp;' * num_spaces}Total : $0"
                 
                     
 
@@ -1012,7 +982,7 @@ def mainPage():
                         updateAll(st.session_state.ticketN, str(st.session_state.workDesDf["Incurred"].get(0)), str(st.session_state.workDesDf["Proposed"].get(0)), st.session_state.labor_df, st.session_state.trip_charge_df, st.session_state.parts_df, st.session_state.miscellaneous_charges_df, st.session_state.materials_non_stock_and_rentals_df, st.session_state.subcontractor_df)
                         updateParent(st.session_state.ticketN, st.session_state.editable, st.session_state.NTE_Quote, savetime, "1900-01-01 00:00:00.000",  "1900-01-01 00:00:00.000", st.session_state.ticketDf["BranchName"].get(0), "save")
                         st.success("Successfully updated to database!")      
-                    incol1, incol2 = st.columns([1,1])
+                    incol1, incol2, incol3 = st.columns([1,1,1])
                     with incol1:
                         if st.button(str(st.session_state.NTE_Quote)+" Approve", key="3"):
                             approvetime = datetime.now()
@@ -1030,6 +1000,7 @@ def mainPage():
                             updateParent(st.session_state.ticketN, 1, st.session_state.NTE_Quote, "1900-01-01 00:00:00.000",  "1900-01-01 00:00:00.000", decline, st.session_state.ticketDf["BranchName"].get(0), "decline")
                             st.success("Successfully updated to declined!")
                             refresh()
+                    incol1, incol2, incol3 = st.columns([1,1,1])            
             category_table_data = []
             for category in categories:
                 table_df = getattr(st.session_state, f"{category.lower().replace(' ', '_').replace('/', '_')}_df")
@@ -1039,7 +1010,7 @@ def mainPage():
                 else:
                     category_table_data.append([f"{category} Total", 0])
 
-            total_price_with_tax = round(total_price * (1 + taxRate / 100.0), 2)
+            total_price_with_tax = total_price * (1 + taxRate / 100.0)
 
             right_column_content = f"""
             **Price (Pre-Tax)**
@@ -1227,7 +1198,7 @@ def mainPage():
                         first_page = False
                         y = 750
                         
-            total_price_with_tax = round(total_price * (1 + taxRate / 100.0), 2)
+            total_price_with_tax = total_price * (1 + taxRate / 100.0)
             c.rect(17, y, block_width, row_height)
             c.drawRightString(block_width + 12, y + 5, f"Price (Pre-Tax): ${total_price:.2f}")
             y -= row_height
@@ -1269,41 +1240,31 @@ def mainPage():
                     st.download_button("Download PDF", merged_buffer, file_name=f'{st.session_state.ticketN}-quote.pdf', mime='application/pdf')
                     st.markdown(pdf_display, unsafe_allow_html=True)
                     
-        if len(st.session_state.ticketDf) != 0 and "MAJ" in st.session_state.ticketDf['LOC_CUSTNMBR'].get(0):
+        if len(st.session_state.ticketDf)!=0 and st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "MAJ0001":
             if st.sidebar.button("Submit to FMDash"):
                 checkout(st.session_state.ticketDf['Purchase_Order'].values[0])
-                status = submitFmQuotes(pdf_base64, st.session_state.ticketDf['Purchase_Order'].values[0], str(st.session_state.workDesDf["Incurred"].get(0)), str(st.session_state.workDesDf["Proposed"].get(0)), st.session_state.labor_df, st.session_state.trip_charge_df, st.session_state.parts_df, st.session_state.miscellaneous_charges_df, st.session_state.materials_non_stock_and_rentals_df, st.session_state.subcontractor_df, total_price, total_price_with_tax)
-                st.sidebar.error(status)
-                st.sidebar.error("Please log into customer portal to assess ticket. The page will refresh in 15 secs")
-                time.sleep(15)
+                submitFmQuotes(pdf_base64, st.session_state.ticketDf['Purchase_Order'].values[0], str(st.session_state.workDesDf["Incurred"].get(0)), str(st.session_state.workDesDf["Proposed"].get(0)), st.session_state.labor_df, st.session_state.trip_charge_df, st.session_state.parts_df, st.session_state.miscellaneous_charges_df, st.session_state.materials_non_stock_and_rentals_df, st.session_state.subcontractor_df, total_price, total_price_with_tax)
                 st.experimental_rerun()
 
         if(len(st.session_state.ticketDf)!=0 and st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "CIR0001"):
             if st.sidebar.button("Submit to CircleK"):
-                status = circleK_wo_cost_information(category_totals.get("Labor", 0),
+                wo_cost_information(category_totals.get("Labor", 0),
                 category_totals.get("Trip Charge", 0),
                 category_totals.get("Parts", 0),
                 category_totals.get("Miscellaneous Charges", 0),
                 category_totals.get("Materials, Non Stock and Rentals", 0),
                 category_totals.get("Subcontractor", 0),
                 taxRate, st.session_state.ticketDf['Purchase_Order'])
-                st.sidebar.error(status)
-                st.sidebar.error("Please log into customer portal to assess ticket. The page will refresh in 15 secs")
-                time.sleep(15)
                 st.experimental_rerun()
-
-        # if(len(st.session_state.ticketDf)!=0 and (st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "MUR0001" or st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "GPM0001" or st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "HER0008")):
-        if(len(st.session_state.ticketDf)!=0 and (st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "MUR0001" or st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "HER0008")):
+        
+        if(len(st.session_state.ticketDf)!=0 and st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "MUR0001"):
             if st.sidebar.button("Submit to Verisae"):
-                status = submitQuoteVerisae(st.session_state.ticketDf['CUST_NAME'].get(0), st.session_state.ticketN, str(st.session_state.workDesDf["Incurred"].get(0)) + str(st.session_state.workDesDf["Proposed"].get(0)), 
+                submitQuoteVerisae(st.session_state.ticketDf['CUST_NAME'].get(0), st.session_state.ticketN, str(st.session_state.workDesDf["Incurred"].get(0)) + str(st.session_state.workDesDf["Proposed"].get(0)), 
                                    category_totals.get("Trip Charge", 0),
                                    category_totals.get("Parts", 0),
                                    category_totals.get("Labor", 0),
                                    category_totals.get("Miscellaneous Charges", 0),
-                                   taxRate, st.session_state.ticketDf['Purchase_Order'][0].strip())
-                st.sidebar.error(status)
-                st.sidebar.error("Please log into customer portal to assess ticket. The page will refresh in 15 secs")
-                time.sleep(15)
+                                   taxRate, st.session_state.ticketDf['Purchase_Order'])
                 st.experimental_rerun()
 
         # except Exception as e:
@@ -1388,7 +1349,7 @@ def pricing():
 #                     )
 
 def main():
-    st.set_page_config("Universal Quote Template")
+    st.set_page_config("Universal Quote Template", layout="wide")
     float_init()
     button_container = st.container()
 
@@ -1411,13 +1372,13 @@ def main():
 
     button_container.float(button_css)
     float_box(
-    'HELP FILE COMING SOON',
-    width="29rem",
-    height="400px",
-    right="10px",
-    bottom=vid_y_pos,
-    css="padding: 0; background-color: white; transition-property: all; transition-duration: .5s; transition-timing-function: cubic-bezier(0, 1, 0.5, 1);",
-    shadow=12
+        '<iframe width="560" height="400" src="http://localhost:8501" title="Streamlit App"></iframe>',
+        width="29rem",
+        height="400px",
+        right="4rem",
+        bottom=vid_y_pos,
+        css="padding: 0; transition-property: all; transition-duration: .5s; transition-timing-function: cubic-bezier(0, 1, 0.5, 1);",
+        shadow=12
     )
     st.markdown(
         """
@@ -1443,48 +1404,6 @@ def main():
                     height: 50px;
                 }
                 </style>
-        <style>
-        .stButton button {
-            float: left;
-        }
-
-        /* Default button styling */
-        .stButton button:first-child {
-            background-color: #0099FF;
-            color: #FFFFFF;
-            width: 120px;
-            height: 50px;
-        }
-
-        .stButton button:hover {
-            background-color: #FFFF00;
-            color: #000000;
-            width: 120px;
-            height: 50px;
-        }
-
-        /* Adjust button size for different DPI settings */
-        @media (min-resolution: 192dpi) {
-            .stButton button:first-child, .stButton button:hover {
-                width: 80px; /* 120px / 1.5 */
-                height: 33.33px; /* 50px / 1.5 */
-            }
-        }
-
-        @media (min-resolution: 144dpi) and (max-resolution: 191dpi) {
-            .stButton button:first-child, .stButton button:hover {
-                width: 96px; /* 120px / 1.25 */
-                height: 40px; /* 50px / 1.25 */
-            }
-        }
-
-        @media (min-resolution: 96dpi) and (max-resolution: 143dpi) {
-            .stButton button:first-child, .stButton button:hover {
-                width: 120px;
-                height: 50px;
-            }
-        }
-        </style>
        """,
         unsafe_allow_html=True,
     )

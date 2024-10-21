@@ -8,34 +8,8 @@ database = os.environ.get("databaseGFT")
 username = os.environ.get("usernameGFT")
 password = os.environ.get("passwordGFT")
 SQLaddress = os.environ.get("addressGFT")
-cryptToken = os.environ.get("cryptToken")
 
-# parameter_value = "230524-0173"
-# latest param 240501-0445
-
-# params on 7/30 CircleKkeyBasic, databaseGFT, fmDashtoken1, fmDashtoken2
-def getToken(custnmbr):
-    conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
-    query = f"""
-    DECLARE @KEY NVARCHAR(255) = '{cryptToken}';
-    SELECT 
-        CUSTNMBR,
-        CAST(DECRYPTBYPASSPHRASE(@KEY, Token_Value) AS NVARCHAR(255)) AS Decrypted_Token_Value
-    FROM [dbo].[MR_Token_Table];
-    """
-
-    conn = pyodbc.connect(conn_str)
-    cursor = conn.cursor()
-
-    cursor.execute(query)
-
-    results = cursor.fetchall()
-    columns = [column[0] for column in cursor.description]
-    tokenDf = pd.DataFrame.from_records(results, columns=columns)
-
-    cursor.close()
-    conn.close()
-    return tokenDf
+parameter_value = "230524-0173"
 
 def getBinddes(input):
     
@@ -77,10 +51,7 @@ def getPartsPrice(partInfoDf):
                 'ITEMDESC': result[0][1],
                 'SellingPrice': result[0][2]
             }
-        
-        row_df = pd.DataFrame([row_dict])
-        pricingDf = pd.concat([pricingDf, row_df], ignore_index=True)
-        # pricingDf = pricingDf.append(row_dict, ignore_index=True)
+        pricingDf = pricingDf.append(row_dict, ignore_index=True)
     
     cursor.close()
     conn.close()
@@ -118,7 +89,6 @@ def getAllPrice(ticketN):
     cursor.close()
     conn.close()
     return ticketDf, LRatesDf, TRatesDf, misc_ops_df
-
 def getDesc(ticket):
     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
     conn = pyodbc.connect(conn_str)
@@ -131,7 +101,6 @@ def getDesc(ticket):
     data = [list(row) for row in dataset]
     workDes = pd.DataFrame(data, columns=["Incurred", "Proposed"])
     return workDes
-
 def getAllTicket(ticket):
     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
     conn = pyodbc.connect(conn_str)
@@ -152,7 +121,7 @@ def getAllTicket(ticket):
     dataset = cursor.fetchall()
     data = [list(row) for row in dataset]
     ticketTripDf = pd.DataFrame(data, columns=["Incurred/Proposed", "Description", "QTY", "UNIT Price", "EXTENDED"])
-    # print(ticketTripDf)
+
     select_query = "Exec CF_Univ_GetParts @TicketID = ?"
     cursor.execute(select_query, (ticket,))
     dataset = cursor.fetchall()
@@ -165,11 +134,11 @@ def getAllTicket(ticket):
     data = [list(row) for row in dataset]
     ticketMiscDf = pd.DataFrame(data, columns=["Description", "QTY", "UNIT Price", "EXTENDED"])
 
-    select_query = "SELECT Incurred, Description, QTY, CAST([UNIT_Price] AS FLOAT) AS [UNIT_Price], CAST(EXTENDED AS FLOAT) AS EXTENDED FROM [CF_Universal_materials_rentals_insert] WHERE TicketID = ?"
+    select_query = "SELECT Description, QTY, CAST([UNIT_Price] AS FLOAT) AS [UNIT_Price], CAST(EXTENDED AS FLOAT) AS EXTENDED FROM [CF_Universal_materials_rentals_insert] WHERE TicketID = ?"
     cursor.execute(select_query, (ticket,))
     dataset = cursor.fetchall()
     data = [list(row) for row in dataset]
-    ticketMaterialsDf = pd.DataFrame(data, columns=["Incurred/Proposed", "Description", "QTY", "UNIT Price", "EXTENDED"])
+    ticketMaterialsDf = pd.DataFrame(data, columns=["Description", "QTY", "UNIT Price", "EXTENDED"])
 
     select_query = "SELECT Description, QTY, CAST([UNIT_Price] AS FLOAT) AS [UNIT_Price], CAST(EXTENDED AS FLOAT) AS EXTENDED FROM [CF_Universal_subcontractor_insert] WHERE TicketID = ?"
     cursor.execute(select_query, (ticket,))
@@ -250,9 +219,9 @@ def updateAll(ticket, incurred, proposed, laborDf,  tripDf, partsDf, miscDf, mat
     cursor.execute(delete_query, (ticket,))
     conn.commit()
     materialDf = materialDf.dropna()
-    data = materialDf[["Incurred/Proposed", "Description", "QTY", "UNIT Price", "EXTENDED"]].values.tolist()
+    data = materialDf[["Description", "QTY", "UNIT Price", "EXTENDED"]].values.tolist()
     data = [row + [ticket] for row in data if all(x is not None for x in row)]
-    insert_query = "INSERT INTO [CF_Universal_materials_rentals_insert] (Incurred, Description, QTY, UNIT_Price, EXTENDED, TicketID) VALUES (?,?,?,?,?,?)"
+    insert_query = "INSERT INTO [CF_Universal_materials_rentals_insert] (Description, QTY, UNIT_Price, EXTENDED, TicketID) VALUES (?,?,?,?,?)"
     if data:
         cursor.executemany(insert_query, data)
     conn.commit()
@@ -360,7 +329,6 @@ def getParent(branchName):
     parentDf['NTE_QUOTE'] = parentDf['NTE_QUOTE'].replace(mapping)
     conn.close()
     return parentDf
-# •	Ability to attach PDF to ticket in GP (open to discussion My suggestion is to also store it in parent table)
 def updateParent(ticket, editable, ntequote, savetime, approved, declined, branchname, button):
     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
     conn = pyodbc.connect(conn_str)
@@ -430,29 +398,3 @@ def updateParent(ticket, editable, ntequote, savetime, approved, declined, branc
     
     cursor.close()
     conn.close()
-
-def getVerisaeCreds(ticket):
-    conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
-    conn = pyodbc.connect(conn_str)
-    cursor = conn.cursor()
-    
-    select_query = '''EXEC [GFT].[dbo].[MR_Univ_User_Info] @ticket_no = ?'''
-    cursor.execute(select_query, (ticket))
-    dataset = cursor.fetchall()
-    data = [list(row) for row in dataset]
-    credsDf = pd.DataFrame(data, columns=["Purchase_Order", "Divisions", "Username", "Password"])
-    conn.close()
-    return (credsDf["Username"], credsDf["Password"])
-
-# def getFmDashCreds():
-#     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
-#     conn = pyodbc.connect(conn_str)
-#     cursor = conn.cursor()
-    
-#     select_query = '''EXEC [GFT].[dbo].[MR_Univ_User_Info] @ticket_no = ?'''
-#     cursor.execute(select_query, (ticket))
-#     dataset = cursor.fetchall()
-#     data = [list(row) for row in dataset]
-#     credsDf = pd.DataFrame(data, columns=["Purchase_Order", "AppointmentID", "Divisions", "Username", "Password"])
-#     conn.close()
-#     return (credsDf["Username"], credsDf["Password"])
