@@ -117,8 +117,8 @@ def deleteTicketDiaglog(ticket):
     # reason = st.text_input("Because...")
     confirm_col, cancel_col = st.columns(2)
     if confirm_col.button("Confirm Delete", key="confirm"):
-        print("Item deleted successfully.")
         deleteTicket(ticket)
+        print("Item deleted successfully.")
         time.sleep(2)  
         refresh()  
     elif cancel_col.button("Cancel", key="cancel"):
