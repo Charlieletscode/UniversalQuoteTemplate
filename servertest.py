@@ -450,11 +450,11 @@ def deleteTicket(ticket):
     # query = 'EXEC CF_SP_Delete_UnvQuotTbles @TicketNumber=?'
     query = '''EXEC [GFT].[dbo].[CF_SP_Delete_UnvQuotTbles] @TicketID = ?'''
     cursor.execute(query, (ticket))
-    print(conn_str, query, (ticket), f",{ticket},")
+    # print(conn_str, query, (ticket))
     # dataset = cursor.fetchall()
     conn.close()
 # utest
-deleteTicket("240630-0027")
+# deleteTicket("240630-0027")
 
 # def getFmDashCreds():
 #     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
