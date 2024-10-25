@@ -113,7 +113,7 @@ def refresh():
 
 @st.dialog("DeleteTicket")
 def deleteTicketDiaglog(ticket):
-    st.write(f"Click to delete {ticket} (double confirmation) currently work is not deleting")
+    st.write(f"Click to delete {ticket} (double confirmation)")
     # reason = st.text_input("Because...")
     confirm_col, cancel_col = st.columns(2)
     if confirm_col.button("Confirm Delete", key="confirm"):
@@ -382,8 +382,10 @@ def mainPage():
                                             fgt_labor_mask = newLabordf['Description'] == "FGT Labor"
                                             if fgt_labor_mask.any():
                                                 fgt_labor_df = newLabordf[fgt_labor_mask]
-                                                fgt_labor_df = fgt_labor_df[['Description', 'Incurred/Proposed', 'EXTENDED']].dropna()
-                                                fgt_labor_df['EXTENDED'] = np.round(pd.to_numeric(fgt_labor_df['EXTENDED'], errors='coerce'), 2)
+                                                # fgt_labor_df = fgt_labor_df[['Description', 'Incurred/Proposed', 'EXTENDED']].dropna()
+                                                fgt_labor_df.fillna(0.0, inplace=True)
+                                                fgt_labor_df['EXTENDED'] = pd.to_numeric(fgt_labor_df['EXTENDED'], errors='coerce').round(2)
+                                                # fgt_labor_df['EXTENDED'] = np.round(pd.to_numeric(fgt_labor_df['EXTENDED'], errors='coerce'), 2)
                                                 st.session_state.labor_df = pd.concat([st.session_state.labor_df, fgt_labor_df], ignore_index=True)
                                             else:
                                                 qty_values = newLabordf["Nums of Techs"]
@@ -402,7 +404,7 @@ def mainPage():
                                                 hourly = pd.to_numeric(newLabordf.loc[rate_mask, 'Hourly Rate'], errors='coerce')
                                                 rounded_extended_values = np.round(np.array(qty_values) * np.array(hourly), 2)
                                                 newLabordf.loc[extended_mask, 'EXTENDED'] = rounded_extended_values
-                                                newLabordf = newLabordf.dropna()
+                                                # newLabordf = newLabordf.dropna()
                                                 st.session_state.labor_df = pd.concat([st.session_state.labor_df, newLabordf], ignore_index=True)
                                                 st.rerun()
                                 if not st.session_state.labor_df.empty:

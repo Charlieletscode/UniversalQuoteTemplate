@@ -2,6 +2,7 @@ import pandas as pd
 import pyodbc
 import json
 import os
+import numpy as np
 
 server = os.environ.get("serverGFT")
 database = os.environ.get("databaseGFT")
@@ -191,79 +192,85 @@ def updateAll(ticket, incurred, proposed, laborDf,  tripDf, partsDf, miscDf, mat
     delete_query = "DELETE FROM [CF_Universal_workdescription_insert] WHERE TicketID = ?"
     cursor.execute(delete_query, (ticket,))
     conn.commit()
-
     insert_query = "INSERT INTO [CF_Universal_workdescription_insert] (TicketID, Incurred_Workdescription, Proposed_Workdescription) VALUES (?, ?, ?)"
     insert_data = [(ticket, incurred, proposed)]
     cursor.executemany(insert_query, insert_data)
     conn.commit()
 
-    delete_query = "DELETE FROM [CF_Universal_labor_insert] WHERE TicketID = ?"
-    cursor.execute(delete_query, (ticket,))
-    conn.commit()
+    if( not laborDf.empty):
+        delete_query = "DELETE FROM [CF_Universal_labor_insert] WHERE TicketID = ?"
+        cursor.execute(delete_query, (ticket,))
+        conn.commit()
 
-    laborDf = laborDf.dropna()
-    data = laborDf[["Incurred/Proposed","Description", "Nums of Techs", "Hours per Tech", "QTY", "Hourly Rate", "EXTENDED"]].values.tolist()
-    data = [row + [ticket] for row in data]
-    insert_query = "INSERT INTO [CF_Universal_labor_insert] (Incurred, Description, Nums_of_Techs, Hours_per_Tech, QTY, Hourly_Rate, EXTENDED, TicketID) VALUES (?,?,?,?,?,?,?,?)"
-    if data:
-        cursor.executemany(insert_query, data)
-    conn.commit()
+        # laborDf = laborDf.dropna()
+        laborDf["EXTENDED"] = pd.to_numeric(laborDf["EXTENDED"], errors='coerce').round(2)
+        laborDf["EXTENDED"] = laborDf["EXTENDED"].replace({np.nan: None})
+        data = laborDf[["Incurred/Proposed","Description", "Nums of Techs", "Hours per Tech", "QTY", "Hourly Rate", "EXTENDED"]].values.tolist()
+        data = [row + [ticket] for row in data]
+        insert_query = "INSERT INTO [CF_Universal_labor_insert] (Incurred, Description, Nums_of_Techs, Hours_per_Tech, QTY, Hourly_Rate, EXTENDED, TicketID) VALUES (?,?,?,?,?,?,?,?)"
+        if data:
+            cursor.executemany(insert_query, data)
+        conn.commit()
 
-    delete_query = "DELETE FROM [CF_Universal_trip_charge_insert] WHERE TicketID = ?"
-    cursor.execute(delete_query, (ticket,))
-    conn.commit()
+    if( not tripDf.empty):
+        delete_query = "DELETE FROM [CF_Universal_trip_charge_insert] WHERE TicketID = ?"
+        cursor.execute(delete_query, (ticket,))
+        conn.commit()
+        tripDf = tripDf.dropna()
+        data = tripDf[["Incurred/Proposed","Description", "QTY", "UNIT Price", "EXTENDED"]].values.tolist()
+        data = [row + [ticket] for row in data]
+        insert_query = "INSERT INTO [CF_Universal_trip_charge_insert] (Incurred, Description, QTY, UNIT_Price, EXTENDED, TicketID) VALUES (?,?,?,?,?,?)"
+        if data:
+            cursor.executemany(insert_query, data)
+        conn.commit()
 
-    tripDf = tripDf.dropna()
-    data = tripDf[["Incurred/Proposed","Description", "QTY", "UNIT Price", "EXTENDED"]].values.tolist()
-    data = [row + [ticket] for row in data]
-    insert_query = "INSERT INTO [CF_Universal_trip_charge_insert] (Incurred, Description, QTY, UNIT_Price, EXTENDED, TicketID) VALUES (?,?,?,?,?,?)"
-    if data:
-        cursor.executemany(insert_query, data)
-    conn.commit()
-
-    delete_query = "DELETE FROM [CF_Universal_parts_insert] WHERE TicketID = ?"
-    cursor.execute(delete_query, (ticket,))
-    conn.commit()
-    partsDf = partsDf.dropna()
-    data = partsDf[["Incurred/Proposed","Description", "QTY", "UNIT Price", "EXTENDED"]].values.tolist()
-    data = [row + [ticket] for row in data if all(x is not None for x in row)]
-    insert_query = "INSERT INTO [CF_Universal_parts_insert] (Incurred, Description, QTY, UNIT_Price, EXTENDED, TicketID) VALUES (?,?,?,?,?,?)"
-    if data:
-        cursor.executemany(insert_query, data)
-    conn.commit()
+    if( not partsDf.empty):
+        delete_query = "DELETE FROM [CF_Universal_parts_insert] WHERE TicketID = ?"
+        cursor.execute(delete_query, (ticket,))
+        conn.commit()
+        partsDf = partsDf.dropna()
+        data = partsDf[["Incurred/Proposed","Description", "QTY", "UNIT Price", "EXTENDED"]].values.tolist()
+        data = [row + [ticket] for row in data if all(x is not None for x in row)]
+        insert_query = "INSERT INTO [CF_Universal_parts_insert] (Incurred, Description, QTY, UNIT_Price, EXTENDED, TicketID) VALUES (?,?,?,?,?,?)"
+        if data:
+            cursor.executemany(insert_query, data)
+        conn.commit()
     
-    delete_query = "DELETE FROM [CF_Universal_misc_charge_insert] WHERE TicketID = ?"
-    cursor.execute(delete_query, (ticket,))
-    conn.commit()
-    miscDf = miscDf.dropna()
-    data = miscDf[["Description", "QTY", "UNIT Price", "EXTENDED"]].values.tolist()
-    data = [row + [ticket] for row in data if all(x is not None for x in row)]
-    insert_query = "INSERT INTO [CF_Universal_misc_charge_insert] (Description, QTY, UNIT_Price, EXTENDED, TicketID) VALUES (?,?,?,?,?)"
-    if data:
-        cursor.executemany(insert_query, data)
-    conn.commit()
+    if ( not miscDf.empty):
+        delete_query = "DELETE FROM [CF_Universal_misc_charge_insert] WHERE TicketID = ?"
+        cursor.execute(delete_query, (ticket,))
+        conn.commit()
+        miscDf = miscDf.dropna()
+        data = miscDf[["Description", "QTY", "UNIT Price", "EXTENDED"]].values.tolist()
+        data = [row + [ticket] for row in data if all(x is not None for x in row)]
+        insert_query = "INSERT INTO [CF_Universal_misc_charge_insert] (Description, QTY, UNIT_Price, EXTENDED, TicketID) VALUES (?,?,?,?,?)"
+        if data:
+            cursor.executemany(insert_query, data)
+        conn.commit()
     
-    delete_query = "DELETE FROM [CF_Universal_materials_rentals_insert] WHERE TicketID = ?"
-    cursor.execute(delete_query, (ticket,))
-    conn.commit()
-    materialDf = materialDf.dropna()
-    data = materialDf[["Incurred/Proposed", "Description", "QTY", "UNIT Price", "EXTENDED"]].values.tolist()
-    data = [row + [ticket] for row in data if all(x is not None for x in row)]
-    insert_query = "INSERT INTO [CF_Universal_materials_rentals_insert] (Incurred, Description, QTY, UNIT_Price, EXTENDED, TicketID) VALUES (?,?,?,?,?,?)"
-    if data:
-        cursor.executemany(insert_query, data)
-    conn.commit()
+    if ( not materialDf.empty):
+        delete_query = "DELETE FROM [CF_Universal_materials_rentals_insert] WHERE TicketID = ?"
+        cursor.execute(delete_query, (ticket,))
+        conn.commit()
+        materialDf = materialDf.dropna()
+        data = materialDf[["Incurred/Proposed", "Description", "QTY", "UNIT Price", "EXTENDED"]].values.tolist()
+        data = [row + [ticket] for row in data if all(x is not None for x in row)]
+        insert_query = "INSERT INTO [CF_Universal_materials_rentals_insert] (Incurred, Description, QTY, UNIT_Price, EXTENDED, TicketID) VALUES (?,?,?,?,?,?)"
+        if data:
+            cursor.executemany(insert_query, data)
+        conn.commit()
     
-    delete_query = "DELETE FROM [CF_Universal_subcontractor_insert] WHERE TicketID = ?"
-    cursor.execute(delete_query, (ticket,))
-    conn.commit()
-    subDf = subDf.dropna()
-    data = subDf[["Description", "QTY", "UNIT Price", "EXTENDED"]].values.tolist()
-    data = [row + [ticket] for row in data if all(x is not None for x in row)]
-    insert_query = "INSERT INTO [CF_Universal_subcontractor_insert] (Description, QTY, UNIT_Price, EXTENDED, TicketID) VALUES (?,?,?,?,?)"
-    if data:
-        cursor.executemany(insert_query, data)
-    conn.commit()
+    if ( not subDf.empty):
+        delete_query = "DELETE FROM [CF_Universal_subcontractor_insert] WHERE TicketID = ?"
+        cursor.execute(delete_query, (ticket,))
+        conn.commit()
+        subDf = subDf.dropna()
+        data = subDf[["Description", "QTY", "UNIT Price", "EXTENDED"]].values.tolist()
+        data = [row + [ticket] for row in data if all(x is not None for x in row)]
+        insert_query = "INSERT INTO [CF_Universal_subcontractor_insert] (Description, QTY, UNIT_Price, EXTENDED, TicketID) VALUES (?,?,?,?,?)"
+        if data:
+            cursor.executemany(insert_query, data)
+        conn.commit()
 
 def getBranch():
     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
@@ -441,18 +448,40 @@ def getVerisaeCreds(ticket):
     conn.close()
     return (credsDf["Username"], credsDf["Password"])
 
-# other params? just ticket curr
+# def execute_stored_procedure(ticket_id):
+#     """Function to execute the stored procedure."""
+#     # Establish connection
+#     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
+#     conn = pyodbc.connect(conn_str)
+#     cursor = conn.cursor()
+#     ticket_id = ticket_id.ljust(15)
+#     sql = """
+#     DECLARE @TicketID CHAR(17) = ?;
+#     EXEC sp_executesql N'EXEC [GFT].[dbo].[CF_SP_Delete_UnvQuotTbles] @TicketID = @P1',
+#                     N'@P1 CHAR(17)', @P1 = @TicketID;
+#     """
+
+#     # Execute the SQL
+#     cursor.execute(sql, ticket_id)
+#     conn.commit()
+# execute_stored_procedure("240630-0027")
+
 def deleteTicket(ticket):
     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
-    
-    # query = 'EXEC CF_SP_Delete_UnvQuotTbles @TicketNumber=?'
-    query = '''EXEC [GFT].[dbo].[CF_SP_Delete_UnvQuotTbles] @TicketID = ?'''
-    cursor.execute(query, (ticket))
-    print(query, (ticket))
+    ticket = ticket.ljust(15)
+    query = '''
+        DECLARE @TicketID CHAR(17) = ?;
+        EXEC sp_executesql N'EXEC [GFT].[dbo].[CF_SP_Delete_UnvQuotTbles] @TicketID = @P1',
+                           N'@P1 CHAR(17)', @P1 = @TicketID;
+    '''
+    cursor.execute(query, ticket)
+    # print(query, (ticket), conn_str)
     # dataset = cursor.fetchall()
+    conn.commit()
     conn.close()
+# deleteTicket("240630-0027")
 
 # def getFmDashCreds():
 #     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
