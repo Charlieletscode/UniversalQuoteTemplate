@@ -1387,11 +1387,11 @@ def main():
         if st.session_state.show:
             if st.button("⭳", type="primary"):
                 st.session_state.show = False
-                st.experimental_rerun()
+                st.rerun()
         else:
             if st.button("⭱", type="secondary"):
                 st.session_state.show = True
-                st.experimental_rerun()
+                st.rerun()
 
     if st.session_state.show:
         vid_y_pos = "0px"
@@ -1399,16 +1399,31 @@ def main():
     else:
         vid_y_pos = "-412px"
         button_css = float_css_helper(width="2.2rem", right="4rem", bottom="1rem", transition=0)
-
+        
     button_container.float(button_css)
     float_box(
-    'HELP FILE COMING SOON',
-    width="29rem",
-    height="400px",
-    right="10px",
-    bottom=vid_y_pos,
-    css="padding: 0; background-color: white; transition-property: all; transition-duration: .5s; transition-timing-function: cubic-bezier(0, 1, 0.5, 1);",
-    shadow=12
+        f"""
+        <div style="
+            display: block; 
+            width: 100%; 
+            height: 100%; 
+            padding-left: 10px; /* Add padding to the right */
+            box-sizing: border-box; /* Ensure padding does not overflow the container */
+        ">
+            <iframe 
+                src="https://scribehow.com/embed/Universal_Quote_Template__237rIL_ESWei_zzNG1yp8A?as=scrollable"
+                width="100%" 
+                height="100%" 
+                style="border: none;">
+            </iframe>
+        </div>
+        """,
+        width="70rem",  # Adjusted for the content
+        height="23rem",  # Adjusted height
+        right="100px",    # Positioning
+        bottom=vid_y_pos,  # Dynamic positioning
+        css="padding: 0; background-color: white; transition-property: all; transition-duration: .5s; transition-timing-function: cubic-bezier(0, 1, 0.5, 1);",
+        shadow=12
     )
     st.markdown(
         """
@@ -1458,14 +1473,14 @@ def main():
         @media (min-resolution: 192dpi) {
             .stButton button:first-child, .stButton button:hover {
                 width: 80px; /* 120px / 1.5 */
-                height: 33.33px; /* 50px / 1.5 */
+                height: 50px; /* 50px / 1.5 */
             }
         }
 
         @media (min-resolution: 144dpi) and (max-resolution: 191dpi) {
             .stButton button:first-child, .stButton button:hover {
-                width: 96px; /* 120px / 1.25 */
-                height: 40px; /* 50px / 1.25 */
+                width: 120px; /* 120px / 1.25 */
+                height: 50px; /* 50px / 1.25 */
             }
         }
 
