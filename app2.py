@@ -99,7 +99,7 @@ def refresh():
         st.session_state[var_name] = None
     st.session_state.edit = False
     st.experimental_set_query_params()
-    st.experimental_rerun()
+    st.rerun()
 def mainPage():
     if "labor_df" not in st.session_state:
         st.session_state.labor_df = pd.DataFrame()
@@ -340,7 +340,7 @@ def mainPage():
                                         newLabordf.loc[extended_mask, 'EXTENDED'] = rounded_extended_values
                                         newLabordf = newLabordf.dropna()
                                         st.session_state.labor_df = pd.concat([st.session_state.labor_df, newLabordf], ignore_index=True)
-                                        st.experimental_rerun()
+                                        st.rerun()
                             if not st.session_state.labor_df.empty:
                                 st.write("Archived Labor (Delete row when necessary please dont add rows)")
                                 tempLabor_df = st.data_editor(
@@ -408,7 +408,7 @@ def mainPage():
                                 category_totals[category] = st.session_state.labor_df['EXTENDED'].sum()
                                 if not tempLabor_df.equals(st.session_state.labor_df):
                                     st.session_state.labor_df = pd.DataFrame(tempLabor_df)
-                                    st.experimental_rerun()
+                                    st.rerun()
                         elif category == 'Trip Charge':
                             string_values = [" : "+str(value).rstrip('0').rstrip('.') for value in st.session_state.TRatesDf['Billing_Amount']]
                             concatenated_values = [description + value for description, value in zip(st.session_state.TRatesDf['Pay_Code_Description'], string_values)]
@@ -524,7 +524,7 @@ def mainPage():
                                             extended_mask = newTripdf['EXTENDED'].isnull()
                                             newTripdf.loc[extended_mask, 'EXTENDED'] = newTripdf.loc[extended_mask, 'UNIT Price'] * qty_values
                                         st.session_state.trip_charge_df = pd.concat([st.session_state.trip_charge_df, newTripdf], ignore_index=True)
-                                        st.experimental_rerun()
+                                        st.rerun()
                                     col1.write("<small>Please enter Unit Price if 0</small>", unsafe_allow_html=True)
                             if not st.session_state.trip_charge_df.empty:
                                 st.write("Archived Trip/Travel Charge (Delete row when necessary please dont add rows)")
@@ -575,7 +575,7 @@ def mainPage():
                                 category_totals[category] = st.session_state.trip_charge_df['EXTENDED'].sum()
                                 if not tempTripDf.equals(st.session_state.trip_charge_df):
                                     st.session_state.trip_charge_df = pd.DataFrame(tempTripDf)
-                                    st.experimental_rerun()
+                                    st.rerun()
                         elif category == 'Parts':
                             # new
                             if st.session_state.pricingDf is None or st.session_state.pricingDf.empty:
@@ -706,7 +706,7 @@ def mainPage():
                                             extended_mask = newParts_df['EXTENDED'].isnull()
                                             newParts_df.loc[extended_mask, 'EXTENDED'] = newParts_df.loc[extended_mask, 'UNIT Price'] * qty_values
                                         st.session_state.parts_df = pd.concat([st.session_state.parts_df, newParts_df], ignore_index=True)
-                                        st.experimental_rerun()
+                                        st.rerun()
                             if not st.session_state.parts_df.empty:
                                 st.write("Archived Parts (Delete row when necessary please dont add rows)")
                                 tempParts_df = st.data_editor(
@@ -757,7 +757,7 @@ def mainPage():
                                 category_totals[category] = st.session_state.parts_df['EXTENDED'].sum()
                                 if not tempParts_df.equals(st.session_state.parts_df):
                                     st.session_state.parts_df = pd.DataFrame(tempParts_df)
-                                    st.experimental_rerun()
+                                    st.rerun()
                         elif category == 'Miscellaneous Charges':
                             string_values = [" : "+f'{value:.2f}'.rstrip('0').rstrip('.') for value in st.session_state.misc_ops_df['Fee_Amount']]
                             concatenated_values = [description + value for description, value in zip(st.session_state.misc_ops_df['Fee_Charge_Type'], string_values)]
@@ -813,7 +813,7 @@ def mainPage():
                                                 'EXTENDED': [None]
                                             }
                                             st.session_state.miscellaneous_charges_df = pd.DataFrame(misc_charges_data)
-                                        st.experimental_rerun()
+                                        st.rerun()
                                 category_total = st.session_state.miscellaneous_charges_df['EXTENDED'].sum()
                                 category_totals[category] = category_total
                         elif category == 'Materials/Non Stock and Rentals':
@@ -868,7 +868,7 @@ def mainPage():
                                             'EXTENDED': [None]
                                         }
                                         st.session_state.materials_non_stock_and_rentals_df = pd.DataFrame(materials_rentals_data)
-                                    st.experimental_rerun()
+                                    st.rerun()
                                 category_total = st.session_state.materials_non_stock_and_rentals_df['EXTENDED'].sum()
                                 category_totals[category] = category_total
                         elif category == 'Subcontractor':
@@ -922,7 +922,7 @@ def mainPage():
                                             'EXTENDED': [None]
                                         }
                                         st.session_state.subcontractor_df = pd.DataFrame(subcontractor_data)
-                                    st.experimental_rerun()
+                                    st.rerun()
                                 category_total = st.session_state.subcontractor_df['EXTENDED'].sum()
                                 category_totals[category] = category_total
                         st.write(f"****{category} Total : {round(category_totals[category], 2)}****")
@@ -936,7 +936,7 @@ def mainPage():
                 
                 if st.button("Expand or Collapse all"):
                     st.session_state.expand_collapse_state = not st.session_state.expand_collapse_state
-                    st.experimental_rerun()
+                    st.rerun()
 
                 category_totals = {}
                 expander_css = """
@@ -1219,6 +1219,10 @@ def mainPage():
                         y = 750
                         
             total_price_with_tax = round(total_price * (1 + taxRate / 100.0), 2)
+            if y - (3 * row_height) < margin_bottom:
+                c.showPage()  # Create a new page
+                first_page = False
+                y = 750
             c.rect(17, y, block_width, row_height)
             c.drawRightString(block_width + 12, y + 5, f"Price (Pre-Tax): ${total_price:.2f}")
             y -= row_height
@@ -1227,7 +1231,7 @@ def mainPage():
             y -= row_height
             c.rect(17, y, block_width, row_height)
             c.drawRightString(block_width + 12, y + 5, f"Total (including tax): ${total_price_with_tax:.2f}")
-
+            y -= row_height
             c.save()
             buffer.seek(0)
             output_pdf = PdfWriter()
@@ -1267,7 +1271,7 @@ def mainPage():
                 st.sidebar.error(status)
                 st.sidebar.error("Please log into customer portal to assess ticket. The page will refresh in 15 secs")
                 time.sleep(15)
-                st.experimental_rerun()
+                st.rerun()
 
         if(len(st.session_state.ticketDf)!=0 and st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "CIR0001"):
             if st.sidebar.button("Submit to CircleK"):
@@ -1281,7 +1285,7 @@ def mainPage():
                 st.sidebar.error(status)
                 st.sidebar.error("Please log into customer portal to assess ticket. The page will refresh in 15 secs")
                 time.sleep(15)
-                st.experimental_rerun()
+                st.rerun()
 
         # if(len(st.session_state.ticketDf)!=0 and (st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "MUR0001" or st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "GPM0001" or st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "HER0008")):
         if(len(st.session_state.ticketDf)!=0 and (st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "MUR0001" or st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "HER0008")):
@@ -1295,7 +1299,7 @@ def mainPage():
                 st.sidebar.error(status)
                 st.sidebar.error("Please log into customer portal to assess ticket. The page will refresh in 15 secs")
                 time.sleep(15)
-                st.experimental_rerun()
+                st.rerun()
 
         # except Exception as e:
         #     st.error("Please enter a ticket number or check the ticket number again")
@@ -1561,7 +1565,7 @@ def main():
             if params and params['TicketID']:
                 st.session_state.ticketN = params['TicketID'][0]
             if(st.session_state.ticketN):
-                st.experimental_rerun()
+                st.rerun()
     else:
         mainPage()
         
