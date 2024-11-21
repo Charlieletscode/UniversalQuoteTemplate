@@ -3,26 +3,10 @@
   <copyright>Verisae, Inc.</copyright>
   <work_orders>
     <work_order>
-      <work_order_number>69737709</work_order_number>
-      <wo_actions>
-        <submit_quote>
-          <user_name>aerb</user_name>
-          <provider>Murphy USA</provider>
-          <quote_number>240501-0445</quote_number>
-          <description>001 - Arrived on site, RC Chceked me in and out the store and I checked in with the MOD. Fueling point 3 was hit by an RV,  you are able to see a some damage on the outside of the dispenser. I opened the dispenser turned off the security and took photos of the damage on the inside of the dispenser. It appears the door took all of the damage. On the lock side near the bottom there is a large crack in the door which this allow will cause it to need the door replaced. The bottom lock was bent in but didn’t hit a meter or a coil. I was able to bend it back to secure the door. And there where other crack on the bottomOf the door near the PPU board. The printer door too is hitting when trying to open it. I think closed the top door and did a fuel test on the dispenser for each metered grades prop valve and to test for leaks on the nozzle, hose, breakaway and whip hose. No leaks were present. The bolts on the bottom of the dispenser all on and tight. The dispenser is secure. I opened the dispenser back up and watch customers use with no issues. EN216760. 3/4  : 0002 - Unit 3 EN216760 NN1. Checked in with the CSR and then started replacing the broken door on unit 3.  Replaced the door and installed the new decals, activated the unit and checked for correct operation. : 0003 - Unit 5 EN216760 NN1. Checked in with the manager and then checked out the dispenser. The dispenser was trusted a little from when hit, but I bent the lower electronics door hing and the unit opens and closes correctly, also the printer door had to be adjusted. : </description>
-          <travel>285.0</travel>
-          <parts>0</parts>
-          <labor>375.0</labor>
-          <misc>12.5</misc>
-          <manual_tax>7.0</manual_tax>
-          <results>
-            <action_status>EXCEPTION</action_status>
-            <work_order_status>Service Complete</work_order_status>
-            <exception_code>202-03</exception_code>
-            <exception_message>This user does not have permission to perform this action</exception_message>
-          </results>
-        </submit_quote>
-      </wo_actions>
+      <work_order_number>TG10216001PA</work_order_number>
+      <wo_actions/>
+      <exception_code>200-02</exception_code>
+      <exception_message>This WORK_ORDER is not accessible for your user</exception_message>
     </work_order>
   </work_orders>
 </WorkOrderActions_response>

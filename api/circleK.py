@@ -3,18 +3,20 @@ import requests
 import pandas as pd
 import re
 import os
-basic = os.environ.get("CircleKkeyBasic")
+
+# creds sync change
+# basic = os.environ.get("CircleKkeyBasic")
 # 230215-0004
 
 if not os.path.exists('api/CircleK/wo_cost_information'):
     os.makedirs('api/CircleK/wo_cost_information')
 
-def circleK_wo_cost_information(labor, trip, parts, misc, materials, sub, taxRate, Purchase_Order):
+def circleK_wo_cost_information(labor, trip, parts, misc, materials, sub, taxRate, Purchase_Order, basicCreds):
     uri = "https://circlek.service-now.com/api/x_nuvo_eam/update_nuvolo_wo/wo_cost_information"
     # url = "https://circlekdev.service-now.com/api/x_nuvo_eam/get_wo_information/open_wo_lists?number=<FWKD1656024>"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": "Basic "+basic
+        "Authorization": "Basic "+basicCreds["Decrypted_Token_Value"][0]
     }
     total = sum([labor, parts, misc, materials, sub]) * (1 + taxRate / 100.0)
     

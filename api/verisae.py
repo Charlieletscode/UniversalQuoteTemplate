@@ -121,7 +121,7 @@ def submitQuoteVerisae(provider, ticketID, des, travelTotal, partsTotal, laborTo
                 return f"Verisae quote submit failed. WORKORDERNUMBER: {work_order_number} WORKORDERSTATUS: {work_order_status_element.text} EXCEPTION: {exception_message_element.text}"
             elif exception_message_element or exception_message_element is not None:
                 exception_message = exception_message_element.text
-                return f"Verisae quote submit failed. WORKORDERNUMBER: {work_order_number} WORKORDERSTATUS: {work_order_status_element.text} EXCEPTION: {exception_message_element.text}"
+                return f"Verisae quote submit failed. WORKORDERNUMBER: {work_order_number} WORKORDERSTATUS: no status return EXCEPTION: {exception_message_element.text}"
             else:
                 return 'Verisae quote submit successfully.'
         else:
