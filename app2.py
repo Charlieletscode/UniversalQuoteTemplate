@@ -1544,7 +1544,7 @@ def mainPage():
                 y -= row_height
                 c.rect(17, y, block_width, row_height)
                 c.drawRightString(block_width + 12, y + 5, f"Total (including tax): ${total_price_with_tax:.2f}")
-            y -= row_height
+                y -= row_height
                 c.save()
                 buffer.seek(0)
                 output_pdf = PdfWriter()
