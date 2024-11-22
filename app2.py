@@ -1802,6 +1802,10 @@ def main():
         """,
         unsafe_allow_html=True
     )
+    selected_branches = st.sidebar.multiselect("Select Branches", st.session_state.branch['BranchName'], key="select_branches", default=["Sanford"])
+    if len(selected_branches) > 0 and selected_branches != st.session_state.selected_branches:
+        st.session_state.selected_branches = selected_branches  
+
     if ('ticketN' in st.session_state and not st.session_state.ticketN):
             st.session_state.parentDf = getParent(st.session_state.selected_branches) 
             st.session_state.parentDf = st.data_editor(
