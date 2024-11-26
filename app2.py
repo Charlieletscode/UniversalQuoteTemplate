@@ -4,6 +4,7 @@ import sys
 import pandas as pd
 from streamlit.web import cli as stcli
 import os
+import webbrowser
 import requests
 from PIL import Image
 import io
@@ -1532,10 +1533,11 @@ def mainPage():
                             y = 750
                             
                 total_price_with_tax = round(total_price * (1 + taxRate / 100.0), 2)
-            if y - (3 * row_height) < margin_bottom:
-                c.showPage()  # Create a new page
-                first_page = False
-                y = 750
+                if y - (3 * row_height) < margin_bottom:
+                    c.showPage()  # Create a new page
+                    first_page = False
+                    c.setFont("Arial", 9)
+                    y = 750
                 c.rect(17, y, block_width, row_height)
                 c.drawRightString(block_width + 12, y + 5, f"Price (Pre-Tax): ${total_price:.2f}")
                 y -= row_height
@@ -1702,106 +1704,83 @@ def pricing():
 
 def main():
     st.set_page_config("Universal Quote Template",layout="wide")
-    float_init()
-    button_container = st.container()
+    help_icon = Image.open("help.png")
 
-    with button_container:
-        if st.session_state.show:
-            if st.button("⭳", type="primary"):
-                st.session_state.show = False
-                st.rerun()
-        else:
-            if st.button("⭱", type="secondary"):
-                st.session_state.show = True
-                st.rerun()
+    with open("help.png", "rb") as img_file:
+        encoded_img = base64.b64encode(img_file.read()).decode()
 
-    if st.session_state.show:
-        vid_y_pos = "0px"
-        button_css = float_css_helper(width="2.2rem", right="4rem", bottom="400px", transition=0)
-    else:
-        vid_y_pos = "-412px"
-        button_css = float_css_helper(width="2.2rem", right="4rem", bottom="1rem", transition=0)
-        
-    button_container.float(button_css)
-    float_box(
+    # Display the image as a clickable "button"
+    st.markdown(
         f"""
-        <div style="
-            display: block; 
-            width: 100%; 
-            height: 100%; 
-            padding-left: 10px; /* Add padding to the right */
-            box-sizing: border-box; /* Ensure padding does not overflow the container */
-        ">
-            <iframe 
-                src="https://scribehow.com/embed/Universal_Quote_Template__237rIL_ESWei_zzNG1yp8A?as=scrollable"
-                width="100%" 
-                height="100%" 
-                style="border: none;">
-            </iframe>
-        </div>
+        <style>
+        .floating-help-button {{
+            position: fixed;
+            bottom: 20px;  /* Adjust vertical position */
+            right: 20px;   /* Adjust horizontal position */
+            width: 50px;   /* Size of the button */
+            height: 50px;  /* Size of the button */
+            z-index: 1000; /* Keep it above other elements */
+            cursor: pointer;
+        }}
+        .floating-help-button img {{
+            width: 100%;  /* Fill the entire button */
+            height: 100%; /* Fill the entire button */
+            border-radius: 50%; /* Circular shape */
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }}
+        .floating-help-button img:hover {{
+            transform: scale(1.1); /* Slight zoom effect */
+            box-shadow: 0px 6px 10px rgba(0, 0, 0, 0.2); /* Enhanced shadow */
+        }}
+        </style>
+        <a href="https://scribehow.com/embed/Universal_Quote_Template__237rIL_ESWei_zzNG1yp8A?as=scrollable" target="_blank" class="floating-help-button">
+            <img src="data:image/png;base64,{encoded_img}" alt="Help Icon">
+        </a>
         """,
-        width="70rem",  # Adjusted for the content
-        height="23rem",  # Adjusted height
-        right="100px",    # Positioning
-        bottom=vid_y_pos,  # Dynamic positioning
-        css="padding: 0; background-color: white; transition-property: all; transition-duration: .5s; transition-timing-function: cubic-bezier(0, 1, 0.5, 1);",
-        shadow=12
+        unsafe_allow_html=True,
     )
+    
     st.markdown(
         """
-        <style>
-        /* Sidebar styling */
-        [data-testid="stSidebar"][aria-expanded="true"] {
-            min-width: 300px;
-            max-width: 300px;
-        }
-        
-        /* Button styling */
-        .stButton button {
-            float: left;
-        }
-
-        /* Default button styling */
-        .stButton button:first-child {
-            background-color: #0099FF;
-            color: #FFFFFF;
-            width: 120px;
-            height: 50px;
-        }
-
-        /* Hover effect */
-        .stButton button:hover {
-            background-color: #FFFF00;
-            color: #000000;
-            width: 120px;
-            height: 50px;
-        }
-
-        /* Adjust button size for different DPI settings */
-        @media (min-resolution: 192dpi) {
-            .stButton button:first-child, .stButton button:hover {
-                width: 80px; /* 120px / 1.5 */
-                height: 50px; /* 50px / 1.5 */
-            }
-        }
-
-        @media (min-resolution: 144dpi) and (max-resolution: 191dpi) {
-            .stButton button:first-child, .stButton button:hover {
-                width: 120px; /* 120px / 1.25 */
-                height: 50px; /* 50px / 1.25 */
-            }
-        }
-
-        @media (min-resolution: 96dpi) and (max-resolution: 143dpi) {
-            .stButton button:first-child, .stButton button:hover {
-                width: 120px;
-                height: 50px;
-            }
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
+       <style>
+       [data-testid="stSidebar"][aria-expanded="true"]{
+           min-width: 300px;
+           max-width: 300px;
+       },
+       <style>
+                .stButton button {
+                    float: left;
+                }
+                .stButton button:first-child {
+                    background-color: #0099FF;
+                    color: #FFFFFF;
+                    width: 120px;
+                    height: 50px;
+                }
+                .stButton button:hover {
+                    background-color: #FFFF00;
+                    color: #000000;
+                    width: 120px;
+                    height: 50px;
+                }
+                </style>
+       """,
+        unsafe_allow_html=True,
     )
+
+    #         if st.button("⭳", type="primary"):
+    #             st.session_state.show = False
+    #             st.rerun()
+    #     else:
+    #         if st.button("⭱", type="secondary"):
+    #             st.session_state.show = True
+    #             st.rerun()
+
+    # if st.session_state.show:
+    # vid_y_pos = "0px"  
+    # button_css = float_css_helper(width="2.2rem", right="4rem", bottom="400px", transition=0)
+    # else:
+
     selected_branches = st.sidebar.multiselect("Select Branches", st.session_state.branch['BranchName'], key="select_branches", default=["Sanford"])
     if len(selected_branches) > 0 and selected_branches != st.session_state.selected_branches:
         st.session_state.selected_branches = selected_branches  
