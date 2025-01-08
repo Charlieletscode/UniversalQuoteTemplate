@@ -84,8 +84,19 @@ if 'expand_collapse_state' not in st.session_state:
     st.session_state.expand_collapse_state = False
 if 'prev_input_letters' not in st.session_state:
     st.session_state.prev_input_letters = ""
+if "pdf_open" not in st.session_state:
+    st.session_state.pdf_open = False
 # if 'filtered_ticket' not in st.session_state:
 #     st.session_state.filtered_ticket = [event for event in st.session_state.filtered_ticket if event['BranchShortName'] in st.session_state.selected_branches]
+
+def changePdfStatus():
+    st.session_state.pdf_open = not st.session_state.pdf_open
+
+def changeEditStatus():
+    st.session_state.edit = not st.session_state.edit
+
+def changeExpandStatus():
+    st.session_state.expand_collapse_state = not st.session_state.expand_collapse_state
 
 def refresh():
     st.session_state.ticketN = ""
@@ -126,7 +137,7 @@ def deleteTicketDiaglog(ticket):
         print("Deletion canceled.")
         st.rerun()
 
-def mainPage():
+def mainPage():        
     if "labor_df" not in st.session_state:
         st.session_state.labor_df = pd.DataFrame()
         st.session_state.trip_charge_df = pd.DataFrame()
@@ -141,9 +152,9 @@ def mainPage():
     image = Image.open(image_path)
     image_height = 200
     resized_image = image.resize((int(image_height * image.width / image.height), image_height))
-
     # try:
     if 'ticketN' in st.session_state and st.session_state.ticketN:
+        st.image(resized_image, width=400)
         if st.session_state.ticketDf is None:
             # st.session_state.refresh_button = False
             st.session_state.ticketDf, st.session_state.LRatesDf, st.session_state.TRatesDf, st.session_state.misc_ops_df = getAllPrice(st.session_state.ticketN)
@@ -154,12 +165,12 @@ def mainPage():
             else:
                 st.session_state.workDesDf = workDes
             st.session_state.labor_df, st.session_state.trip_charge_df, st.session_state.parts_df, st.session_state.miscellaneous_charges_df, st.session_state.materials_non_stock_and_rentals_df, st.session_state.subcontractor_df = getAllTicket(ticket=st.session_state.ticketN)
-        col1, col2 = st.sidebar.columns(2)
-        if col1.button("goBack", key="5"):
+        st.sidebar.write("Actions")
+        if st.sidebar.button("**Find Another Quote**", key="5"):
             refresh()
-        if col2.button("Delete", key="6", help="Click to delete (requires confirmation)"):
-            st.write("Item deleted successfully.")
-            deleteTicketDiaglog(st.session_state.ticketN)
+        # if st.sidebar.button("Delete Quote", key="6", help="Click to delete (requires confirmation)"):
+        #     st.write("Item deleted successfully.")
+        #     deleteTicketDiaglog(st.session_state.ticketN)
             # deleteTicket(st.session_state.ticketN)
             # time.sleep(5)  
             # refresh()  
@@ -174,8 +185,7 @@ def mainPage():
             # elif cancel_col.button("Cancel", key="cancel"):
             #     print("Deletion canceled.")
         else:
-            st.subheader("Main Page")
-            st.write("Welcome to the main page of the Fee Charge Types application.")
+
             if len(st.session_state.ticketDf)==0:
                 st.error("Please enter a ticket number or check the ticket number again")
                 # st.session_state.refresh_button = True
@@ -198,16 +208,25 @@ def mainPage():
                             st.session_state.ticketDf['CUST_CITY'] + " " + st.session_state.ticketDf['CUST_Zip'],
                         'ATTN': ['ATTN']
                     }    
-                        
-                col1, col2 = st.sidebar.columns(2)
-                with col1:
-                    if st.button("Edit", key="1"):
-                        st.session_state.edit = True
-                with col2:
-                    if st.button("View", key="2"):
-                        st.session_state.edit = False
+
+                if st.session_state.edit:
+                    if st.sidebar.button("**Save Changes**"):        
+                        savetime = datetime.now()
+                        updateAll(st.session_state.ticketN, str(st.session_state.workDesDf["Incurred"].get(0)), str(st.session_state.workDesDf["Proposed"].get(0)), st.session_state.labor_df, st.session_state.trip_charge_df, st.session_state.parts_df, st.session_state.miscellaneous_charges_df, st.session_state.materials_non_stock_and_rentals_df, st.session_state.subcontractor_df)
+                        updateParent(st.session_state.ticketN, st.session_state.editable, st.session_state.NTE_Quote, savetime, "1900-01-01 00:00:00.000",  "1900-01-01 00:00:00.000", st.session_state.ticketDf["BranchName"].get(0), "save")
+                        st.success("Successfully updated to database!") 
+                        time.sleep(5)  
+                        st.rerun()
+                    if st.sidebar.button("**Cancel**"):
+                        changeEditStatus()
+                        st.rerun()
+                # check editable
+                elif st.session_state.editable:
+                    if st.sidebar.button("**Edit Quote**"):
+                        changeEditStatus()
+                        st.rerun()
+                    
                 
-                col1, col2 = st.columns((2,1))
                 df_left = pd.DataFrame(left_data)
                 left_table_styles = [
                     {'selector': 'table', 'props': [('text-align', 'left'), ('border-collapse', 'collapse')]},
@@ -215,8 +234,7 @@ def mainPage():
                 ]
                 df_left_styled = df_left.style.set_table_styles(left_table_styles)
 
-                col1.dataframe(df_left_styled, hide_index=True)
-                col2.image(resized_image, width=300)
+                st.dataframe(df_left_styled, hide_index=True)
 
                 # Ticket Info table
                 data = {
@@ -276,6 +294,44 @@ def mainPage():
                     }
                     st.session_state.subcontractor_df = pd.DataFrame(subcontractor_data)
                 st.write("**UNLESS SPECIFICALLY NOTED, THIS PROPOSAL IS VALID FOR 30 DAYS FROM THE DATE ABOVE**")
+                if st.session_state.editable:
+                    incol1, incol2, incol3, incol4 = st.columns([3,1,1,1])
+                    # with incol1:
+                    # Display custom-styled buttons and handle their actions
+                    # rear butt
+                    with incol2:
+                        # st.sidebar.markdown('<span id="approve-after"></span>', unsafe_allow_html=True)
+                        # origin "approve" in st.session_state
+                        if st.sidebar.button("**Approve**"):
+                            print("approved clicked")
+                            approvetime = datetime.now()
+                            approve = approvetime.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                            st.session_state.editable = 0
+                            updateAll(st.session_state.ticketN, str(st.session_state.workDesDf["Incurred"].get(0)), str(st.session_state.workDesDf["Proposed"].get(0)), st.session_state.labor_df, st.session_state.trip_charge_df, st.session_state.parts_df, st.session_state.miscellaneous_charges_df, st.session_state.materials_non_stock_and_rentals_df, st.session_state.subcontractor_df)
+                            updateParent(st.session_state.ticketN, st.session_state.editable, st.session_state.NTE_Quote, "1900-01-01 00:00:00.000", approve, "1900-01-01 00:00:00.000", st.session_state.ticketDf["BranchName"].get(0), "approve")
+                            st.sidebar.success("Successfully updated to Gp!")
+                            time.sleep(3)
+                            refresh()
+                    with incol3:
+                        # st.markdown('<span id="decline-after"></span>', unsafe_allow_html=True)
+                        # origin "decline" in st.session_state
+                        if st.sidebar.button("**Decline**"):
+                            print("decline clicked")
+                            declinetime = datetime.now()
+                            decline = declinetime.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                            updateAll(st.session_state.ticketN, str(st.session_state.workDesDf["Incurred"].get(0)), str(st.session_state.workDesDf["Proposed"].get(0)), st.session_state.labor_df, st.session_state.trip_charge_df, st.session_state.parts_df, st.session_state.miscellaneous_charges_df, st.session_state.materials_non_stock_and_rentals_df, st.session_state.subcontractor_df)
+                            updateParent(st.session_state.ticketN, 1, st.session_state.NTE_Quote, "1900-01-01 00:00:00.000", "1900-01-01 00:00:00.000", decline, st.session_state.ticketDf["BranchName"].get(0), "decline")
+                            st.sidebar.success("Successfully updated to declined!")
+                            time.sleep(3)
+                            refresh()
+                    
+                    with incol4:
+                        # st.markdown('<span id="delete-after"></span>', unsafe_allow_html=True)
+                        # origin "decline" in st.session_state
+                        if st.sidebar.button("**Delete Quote**"):
+                            print("delete clicked")
+                            st.sidebar.warning("Ticket deleted successfully.")
+                            deleteTicketDiaglog(st.session_state.ticketN)
                 if st.session_state.editable and st.session_state.edit:
                     with st.expander("Work Description", expanded=True):
                         with st.container():
@@ -293,14 +349,14 @@ def mainPage():
                         st.session_state.NTE_Quote = st.radio("Select Option:", ["NTE", "Quote"])
                     col1, col2 = st.columns([1, 3])
 
-                    categories = ['Labor', 'Trip Charge', 'Parts', 'Miscellaneous Charges', 'Materials/Non Stock and Rentals', 'Subcontractor']
+                    categories = ['Labor', 'Trip Charge', 'Parts', 'Miscellaneous Charges', 'Other', 'Subcontractor']
                     category_totals = {category: 0 for category in categories}
 
                     for category in categories:
                         with st.expander(f"******{category}******", expanded=True):
                             st.title(category)                          
-                            width = 700
-                            inwidth = 500
+                            width = 1000
+                            inwidth = 700
                             if category == 'Labor':
                                 labor_data = {
                                     'Incurred/Proposed': [None],
@@ -377,7 +433,7 @@ def mainPage():
                                         key=category+"df"
                                     )
                                     col1, col2 = st.columns([3,1])
-                                    submit_button = col2.form_submit_button(label='Submit')
+                                    submit_button = col2.form_submit_button(label=f'Submit {category}')
                                     if not newLabordf.empty:
                                         if submit_button:
                                             fgt_labor_mask = newLabordf['Description'] == "FGT Labor"
@@ -578,7 +634,7 @@ def mainPage():
                                             key=category+"df"
                                         )
                                     col1, col2 = st.columns([3,1])
-                                    submit_button = col2.form_submit_button(label='Submit')
+                                    submit_button = col2.form_submit_button(label=f'Submit {category}')
                                     if not newTripdf.empty:
                                         if submit_button:
                                             qty_mask = newTripdf['QTY'].notnull()
@@ -762,7 +818,7 @@ def mainPage():
                                             key=category+"df"
                                         )
                                         col1, col2 = st.columns([3, 1])
-                                        submit_button = col2.form_submit_button(label='Submit')
+                                    submit_button = col2.form_submit_button(label=f'Submit {category}')
                                     if not newParts_df.empty:
                                         if submit_button and len(st.session_state.input_letters) > 0:
                                             qty_mask = newParts_df['QTY'].notnull()
@@ -1102,7 +1158,7 @@ def mainPage():
                                         key=category
                                     )                        
                                     col1, col2 = st.columns([3,1])
-                                    submit_button = col2.form_submit_button(label='Submit')
+                                    submit_button = col2.form_submit_button(label=f'Submit {category}')
                                     if submit_button:
                                             qty_values = st.session_state.miscellaneous_charges_df['QTY']
                                             mask = qty_values.notnull() & st.session_state.miscellaneous_charges_df['Description'].notnull()
@@ -1120,7 +1176,8 @@ def mainPage():
                                             st.rerun()
                                     category_total = st.session_state.miscellaneous_charges_df['EXTENDED'].sum()
                                     category_totals[category] = category_total
-                            elif category == 'Materials/Non Stock and Rentals':
+                            elif category == 'Other':
+                                st.write("Include Mileage, Materials/Non Stock, Rentals, and other items here")
                                 with st.form(key=f'{category}_form'):
                                     st.session_state.materials_non_stock_and_rentals_df = st.data_editor(
                                         st.session_state.materials_non_stock_and_rentals_df,
@@ -1164,7 +1221,7 @@ def mainPage():
                                         key=category
                                     )
                                     col1, col2 = st.columns([3,1])
-                                    submit_button = col2.form_submit_button(label='Submit')
+                                    submit_button = col2.form_submit_button(label=f'Submit {category}')
                                     if submit_button:
                                         qty_values = st.session_state.materials_non_stock_and_rentals_df['QTY']
                                         unit_price_values = st.session_state.materials_non_stock_and_rentals_df['UNIT Price']
@@ -1219,7 +1276,7 @@ def mainPage():
                                         key=category
                                     )
                                     col1, col2 = st.columns([3,1])
-                                    submit_button = col2.form_submit_button(label='Submit')
+                                    submit_button = col2.form_submit_button(label=f'Submit {category}')
                                     if submit_button:
                                         qty_values = st.session_state.subcontractor_df['QTY']
                                         unit_price_values = st.session_state.subcontractor_df['UNIT Price']
@@ -1243,11 +1300,16 @@ def mainPage():
                             st.text_area('***General description of Incurred:***', value = str(st.session_state.workDesDf["Incurred"].get(0)), disabled=True, height=100)
                             st.text_area('***General description of Proposed work to be performed:***', value = str(st.session_state.workDesDf["Proposed"].get(0)), disabled=True, height=100)
                     st.write(f"NTE_Quote is {st.session_state.NTE_Quote}")
-                    categories = ['Labor', 'Trip Charge', 'Parts', 'Miscellaneous Charges', 'Materials/Non Stock and Rentals', 'Subcontractor']
-                    
-                    if st.button("Expand or Collapse all"):
-                        st.session_state.expand_collapse_state = not st.session_state.expand_collapse_state
-                        st.rerun()
+                    categories = ['Labor', 'Trip Charge', 'Parts', 'Miscellaneous Charges', 'Other', 'Subcontractor']
+
+                    if st.session_state.expand_collapse_state:
+                        if st.button("Collapse Sections"):
+                            changeExpandStatus()
+                            st.rerun()
+                    else:
+                        if st.button("Expand Sections"):
+                            changeExpandStatus()
+                            st.rerun()
 
                     category_totals = {}
                     expander_css = """
@@ -1260,7 +1322,10 @@ def mainPage():
                     st.markdown(expander_css, unsafe_allow_html=True)
                     desired_width = 180
                     for category in categories:
-                        table_df = getattr(st.session_state, f"{category.lower().replace(' ', '_').replace('/', '_')}_df")
+                        if(category.lower().replace(' ', '_').replace('/', '_') == "other"):
+                            table_df = getattr(st.session_state, "materials_non_stock_and_rentals_df")
+                        else:
+                            table_df = getattr(st.session_state, f"{category.lower().replace(' ', '_').replace('/', '_')}_df")
                         if not table_df.empty and 'EXTENDED' in table_df.columns:
                             table_df['EXTENDED'] = pd.to_numeric(table_df['EXTENDED'], errors='coerce')
                             category_total = table_df['EXTENDED'].sum()
@@ -1277,12 +1342,16 @@ def mainPage():
                             current_title = f"{category} Total : $0"
                             num_spaces = desired_width - len(current_title)
                             expanderTitle = f"{category}{'&nbsp;'}Total : $0"
-                    
-                        
 
                         with st.expander(expanderTitle, expanded=st.session_state.expand_collapse_state):
-                            cleaned_category = category.lower().replace(' ', '_').replace('/', '_')
-                            table_df = getattr(st.session_state, f"{cleaned_category}_df")
+                            # for category in categories:
+                            #     if(category.lower().replace(' ', '_').replace('/', '_') == "other"):
+                            #         table_df = getattr(st.session_state, "materials_non_stock_and_rentals_df")
+                            #     else:
+                            #         table_df = getattr(st.session_state, f"{category.lower().replace(' ', '_').replace('/', '_')}_df")
+                            #     print(f"{category.lower().replace(' ', '_').replace('/', '_')}_df")
+                            # cleaned_category = category.lower().replace(' ', '_').replace('/', '_')
+                            # table_df = getattr(st.session_state, f"{cleaned_category}_df")
                             st.table(table_df)
                                 
                 left_column_content = """
@@ -1307,35 +1376,28 @@ def mainPage():
                 if parentDf["Status"].get(0) is not None and (parentDf["Status"].get(0) == "Approved" or parentDf["Status"].get(0) == "Processed"):
                     with col1:
                         st.error("Status is now " + parentDf["Status"].get(0))
-                        incol1, incol2, incol3 = st.columns([1,1,1])            
-                else:
-                    with col1:
-                        if st.button("Save"):        
-                            savetime = datetime.now()
-                            updateAll(st.session_state.ticketN, str(st.session_state.workDesDf["Incurred"].get(0)), str(st.session_state.workDesDf["Proposed"].get(0)), st.session_state.labor_df, st.session_state.trip_charge_df, st.session_state.parts_df, st.session_state.miscellaneous_charges_df, st.session_state.materials_non_stock_and_rentals_df, st.session_state.subcontractor_df)
-                            updateParent(st.session_state.ticketN, st.session_state.editable, st.session_state.NTE_Quote, savetime, "1900-01-01 00:00:00.000",  "1900-01-01 00:00:00.000", st.session_state.ticketDf["BranchName"].get(0), "save")
-                            st.success("Successfully updated to database!")      
-                        incol1, incol2 = st.columns([1,1])
-                        with incol1:
-                            if st.button(str(st.session_state.NTE_Quote)+" Approve", key="3"):
-                                approvetime = datetime.now()
-                                approve = approvetime.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                                st.session_state.editable = 0
-                                updateAll(st.session_state.ticketN, str(st.session_state.workDesDf["Incurred"].get(0)), str(st.session_state.workDesDf["Proposed"].get(0)), st.session_state.labor_df, st.session_state.trip_charge_df, st.session_state.parts_df, st.session_state.miscellaneous_charges_df, st.session_state.materials_non_stock_and_rentals_df, st.session_state.subcontractor_df)
-                                updateParent(st.session_state.ticketN, st.session_state.editable, st.session_state.NTE_Quote, "1900-01-01 00:00:00.000", approve,  "1900-01-01 00:00:00.000", st.session_state.ticketDf["BranchName"].get(0), "approve")
-                                st.success("Successfully updated to Gp!")
-                                refresh()
-                        with incol2:
-                            if st.button(str(st.session_state.NTE_Quote)+"\nDecline", key="4"):
-                                declinetime = datetime.now()
-                                decline = declinetime.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                                updateAll(st.session_state.ticketN, str(st.session_state.workDesDf["Incurred"].get(0)), str(st.session_state.workDesDf["Proposed"].get(0)), st.session_state.labor_df, st.session_state.trip_charge_df, st.session_state.parts_df, st.session_state.miscellaneous_charges_df, st.session_state.materials_non_stock_and_rentals_df, st.session_state.subcontractor_df)
-                                updateParent(st.session_state.ticketN, 1, st.session_state.NTE_Quote, "1900-01-01 00:00:00.000",  "1900-01-01 00:00:00.000", decline, st.session_state.ticketDf["BranchName"].get(0), "decline")
-                                st.success("Successfully updated to declined!")
-                                refresh()
+                        # incol1, incol2, incol3 = st.columns([1,1,1])            
+                # else:
+                #     subcol1, subcol2, subcol3 = col1.columns([1, 1, 1])
+                #     with subcol1:
+                #         if st.session_state.edit and st.sidebar.button("Save Changes"):        
+                #             savetime = datetime.now()
+                #             updateAll(st.session_state.ticketN, str(st.session_state.workDesDf["Incurred"].get(0)), str(st.session_state.workDesDf["Proposed"].get(0)), st.session_state.labor_df, st.session_state.trip_charge_df, st.session_state.parts_df, st.session_state.miscellaneous_charges_df, st.session_state.materials_non_stock_and_rentals_df, st.session_state.subcontractor_df)
+                #             updateParent(st.session_state.ticketN, st.session_state.editable, st.session_state.NTE_Quote, savetime, "1900-01-01 00:00:00.000",  "1900-01-01 00:00:00.000", st.session_state.ticketDf["BranchName"].get(0), "save")
+                #             st.success("Successfully updated to database!")   
+                #     with subcol2:
+                #         st.markdown('<span id="cancel-after"></span>', unsafe_allow_html=True)
+                #         if st.session_state.edit and st.sidebar.button("Cancel"):
+                #             st.session_state.edit = not st.session_state.edit  # Set edit mode to False
+                #             st.rerun()  # Refresh page to reflect changes
+
+ 
                 category_table_data = []
                 for category in categories:
-                    table_df = getattr(st.session_state, f"{category.lower().replace(' ', '_').replace('/', '_')}_df")
+                    if(category.lower().replace(' ', '_').replace('/', '_') == "other"):
+                        table_df = getattr(st.session_state, "materials_non_stock_and_rentals_df")
+                    else:
+                        table_df = getattr(st.session_state, f"{category.lower().replace(' ', '_').replace('/', '_')}_df")
                     if not table_df.empty:
                         category_table_data.append([f"{category} Total", category_totals[category]])
                         total_price += category_totals[category]
@@ -1441,8 +1503,10 @@ def mainPage():
                         first_page = False
                         new_page_needed = False
                         y = 750
-
-                    table_df = getattr(st.session_state, f"{category.lower().replace(' ', '_').replace('/', '_')}_df")
+                    if(category.lower().replace(' ', '_').replace('/', '_') == "other"):
+                        table_df = getattr(st.session_state, "materials_non_stock_and_rentals_df")
+                    else:
+                        table_df = getattr(st.session_state, f"{category.lower().replace(' ', '_').replace('/', '_')}_df")
                     row_height = 20
                     category_column_width = block_width / 7
 
@@ -1570,17 +1634,25 @@ def mainPage():
 
                 pdf_content = merged_buffer.read()
                 pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
-                
-                if incol2.button("Close PDF"):
-                    incol2.text("PDF Closed")
-                if(incol1.button("Open PDF")):
-                    with col1:
-                        pdf_display = F'<iframe src="data:application/pdf;base64,{pdf_base64}" width="800" height="950" type="application/pdf"></iframe>'
-                        st.download_button("Download PDF", merged_buffer, file_name=f'{st.session_state.ticketN}-quote.pdf', mime='application/pdf')
-                        st.markdown(pdf_display, unsafe_allow_html=True)
-                        
+
+                if st.session_state.pdf_open:
+                    if st.button("Close PDF"):
+                        changePdfStatus()
+                        st.rerun()
+                else:
+                    if st.button("Open PDF"):
+                        changePdfStatus()
+                        st.rerun()
+
+                # Display the PDF if open
+                if st.session_state.pdf_open:
+                    pdf_display = f'<iframe src="data:application/pdf;base64,{pdf_base64}" width="800" height="950" type="application/pdf"></iframe>'
+                    st.markdown(pdf_display, unsafe_allow_html=True)
+                    # Add a download button for the PDF
+                    st.download_button("Download PDF", merged_buffer, file_name=f'{st.session_state.ticketN}-quote.pdf', mime='application/pdf')
+
             if len(st.session_state.ticketDf) != 0 and "MAJ" in st.session_state.ticketDf['LOC_CUSTNMBR'].get(0):
-                if st.sidebar.button("Submit to FMDash"):
+                if st.sidebar.button("**Send to FMDash**"):
                     token1 = getCredsToken("MAJ0001")
                     checkout(token1['Decrypted_Token_Value'].values[0], st.session_state.ticketDf['Purchase_Order'].values[0])
                     # status = submitFmQuotes(token1, pdf_base64, st.session_state.ticketDf['Purchase_Order'].values[0], str(st.session_state.workDesDf["Incurred"].get(0)), str(st.session_state.workDesDf["Proposed"].get(0)), st.session_state.labor_df, st.session_state.trip_charge_df, st.session_state.parts_df, st.session_state.miscellaneous_charges_df, st.session_state.materials_non_stock_and_rentals_df, st.session_state.subcontractor_df, total_price, total_price_with_tax)
@@ -1593,7 +1665,7 @@ def mainPage():
                     st.rerun()
 
             if(len(st.session_state.ticketDf)!=0 and st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "CIR0001"):
-                if st.sidebar.button("Submit to CircleK"):
+                if st.sidebar.button("**Send to CircleK**"):
                     basicCreds = getCredsToken("CIR0001")
                     status = circleK_wo_cost_information(category_totals.get("Labor", 0),
                     category_totals.get("Trip Charge", 0),
@@ -1609,7 +1681,7 @@ def mainPage():
 
             # if(len(st.session_state.ticketDf)!=0 and (st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "MUR0001" or st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "GPM0001" or st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "HER0008")):
             if(len(st.session_state.ticketDf)!=0 and (st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "MUR0001" or st.session_state.ticketDf['LOC_CUSTNMBR'].get(0) == "HER0008")):
-                if st.sidebar.button("Submit to Verisae"):
+                if st.sidebar.button("**Send to Verisae**"):
                     status = submitQuoteVerisae(st.session_state.ticketDf['CUST_NAME'].get(0), st.session_state.ticketN, str(st.session_state.workDesDf["Incurred"].get(0)) + str(st.session_state.workDesDf["Proposed"].get(0)), 
                                     category_totals.get("Trip Charge", 0),
                                     category_totals.get("Parts", 0),
@@ -1711,60 +1783,200 @@ def main():
 
     # Display the image as a clickable "button"
     st.markdown(
-        f"""
+        """
         <style>
-        .floating-help-button {{
+        /* Universal Button Styling */
+        .stButton button {
+            background-color: #0099FF; /* Default blue background */
+            color: #FFFFFF; /* White text */
+            border: 2px solid #003366; /* Dark blue border */
+            width: 160px; /* Fixed width */
+            min-height: 50px; /* Minimum height */
+            padding: 10px 20px; /* Consistent padding */
+            font-size: 16px; /* Font size */
+            border-radius: 5px; /* Rounded corners */
+            text-align: center;
+            display: inline-block;
+            line-height: 1.2; /* Allow multiple lines of text */
+            word-wrap: break-word; /* Wrap long words */
+            white-space: normal; /* Allow text wrapping */
+            transition: all 0.3s ease; /* Smooth transition for hover effects */
+        }
+        [data-testid="stSidebar"] .stButton button {
+            background-color: #003356; /* Dark blue background */
+            color: #ffffff; /* White text */
+            font-weight: bold; /* Bold text for better emphasis */
+            border: 1px solid #002740; /* Darker blue border */
+            width: 140px; /* Fixed width */
+            min-height: 40px; /* Minimum height */
+            padding: 8px 16px; /* Smaller padding */
+            font-size: 14px; /* Smaller font size */
+            border-radius: 3px; /* Slightly rounded corners */
+            text-align: center;
+            display: inline-block;
+            line-height: 1.2; /* Allow multiple lines of text */
+            word-wrap: break-word; /* Wrap long words */
+            white-space: normal; /* Allow text wrapping */
+            transition: all 0.3s ease; /* Smooth transition for hover effects */
+        }
+        [data-testid="stSidebar"] .stButton button:hover {
+            background-color: #002740; /* Darker blue on hover */
+            color: #ffffff; /* White text on hover */
+            transform: scale(1.02); /* Slight scale on hover */
+            box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+            font-weight: bold; /* Ensure bold text is retained on hover */
+        }
+        
+        .stFormSubmitButton button {
+            background-color: #0099FF; /* Default blue background */
+            color: #FFFFFF; /* White text */
+            border: 2px solid #003366; /* Dark blue border */
+            width: 250px; /* Fixed width */
+            min-height: 50px; /* Minimum height */
+            padding: 10px 20px; /* Consistent padding */
+            font-size: 16px; /* Font size */
+            border-radius: 5px; /* Rounded corners */
+            text-align: center;
+            display: inline-block;
+            line-height: 1.2; /* Allow multiple lines of text */
+            # word-wrap: break-word; /* Wrap long words */
+            white-space: normal; /* Allow text wrapping */
+            transition: all 0.3s ease; /* Smooth transition for hover effects */
+        }
+        .stButton button:hover, .stFormSubmitButton button:hover {
+            background-color: #003366; /* Darker blue on hover */
+            color: #FFFFFF; /* White text on hover */
+            transform: scale(1.05); /* Slight scale on hover */
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow */
+        }
+
+        /* Adjust Dynamic Height Based on Content */
+        .stButton button {
+            display: flex; /* Flexbox layout for dynamic sizing */
+            align-items: center; /* Center align vertically */
+            justify-content: center; /* Center align horizontally */
+            min-height: 50px; /* Base height */
+
+        }/* Floating Help Button */
+        .floating-help-button {
             position: fixed;
-            bottom: 20px;  /* Adjust vertical position */
-            right: 20px;   /* Adjust horizontal position */
-            width: 50px;   /* Size of the button */
-            height: 50px;  /* Size of the button */
-            z-index: 1000; /* Keep it above other elements */
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            z-index: 1000;
             cursor: pointer;
-        }}
-        .floating-help-button img {{
-            width: 100%;  /* Fill the entire button */
-            height: 100%; /* Fill the entire button */
-            border-radius: 50%; /* Circular shape */
+        }
+        .floating-help-button img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }}
-        .floating-help-button img:hover {{
-            transform: scale(1.1); /* Slight zoom effect */
-            box-shadow: 0px 6px 10px rgba(0, 0, 0, 0.2); /* Enhanced shadow */
-        }}
+        }
+        .floating-help-button img:hover {
+            transform: scale(1.1);
+            box-shadow: 0px 6px 10px rgba(0, 0, 0, 0.2);
+        }
         </style>
-        <a href="https://scribehow.com/embed/Universal_Quote_Template__237rIL_ESWei_zzNG1yp8A?as=scrollable" target="_blank" class="floating-help-button">
-            <img src="data:image/png;base64,{encoded_img}" alt="Help Icon">
-        </a>
         """,
         unsafe_allow_html=True,
     )
-    
+
+    # cancel button
     st.markdown(
         """
-       <style>
-       [data-testid="stSidebar"][aria-expanded="true"]{
-           min-width: 300px;
-           max-width: 300px;
-       },
-       <style>
-                .stButton button {
-                    float: left;
-                }
-                .stButton button:first-child {
-                    background-color: #0099FF;
-                    color: #FFFFFF;
-                    width: 120px;
-                    height: 50px;
-                }
-                .stButton button:hover {
-                    background-color: #FFFF00;
-                    color: #000000;
-                    width: 120px;
-                    height: 50px;
-                }
-                </style>
-       """,
+        <style>
+        .element-container:has(#approve-after) + div [data-testid="stSidebar"] .stButton button {
+            background-color: #159223; /* Green */
+            border-color: #034f0c;
+            position: fixed;
+            top: 10%; /* 10% from the top of the screen */
+            right: 35%; /* 30% from the right of the screen */
+            z-index: 1000;
+        }
+
+            
+        .element-container:has(#approve-after) {
+            display: none; /* Hide certain elements */
+        }
+
+        .element-container:has(#decline-after) + div [data-testid="stSidebar"] .stButton button {
+            background-color: #d30000; /* Red */
+            border-color: #921515;
+            position: fixed;
+            top: 10%; /* 10% from the top of the screen */
+            right: 20%; /* 20% from the right of the screen */
+            z-index: 1000;
+        }
+
+        .element-container:has(#decline-after) {
+            display: none; /* Hide certain elements */
+        }
+
+        .element-container:has(#delete-after) + div [data-testid="stSidebar"] .stButton button {
+            background-color:rgb(211, 123, 0); /* Red */
+            border-color:rgba(202, 118, 1, 0.69);
+            position: fixed;
+            top: 10%; /* 10% from the top of the screen */
+            right: 5%; /* 20% from the right of the screen */
+            z-index: 1000;
+            border: 2px solid #414141; /* Border color */
+            padding: 10px 20px; /* Padding for better button spacing */
+            font-size: 16px; /* Font size */
+            border-radius: 5px; /* Rounded corners */
+            text-align: center; /* Align text in the center */
+            cursor: pointer; /* Pointer cursor on hover */
+            transition: all 0.3s ease; /* Smooth hover effect */
+            display: inline-block; /* Keeps button inline */
+        }
+
+        .element-container:has(#delete-after) {
+            display: none; /* Hide certain elements */
+        }
+
+        /* Hide content when an element with 'cancel' ID exists */
+        .element-container:has(#cancel-after) + div button {
+        background-color: #898989; /* Button color */
+        border: 2px solid #414141; /* Border color */
+        color: #ffffff; /* Text color */
+        padding: 10px 20px; /* Padding for better button spacing */
+        font-size: 16px; /* Font size */
+        border-radius: 5px; /* Rounded corners */
+        text-align: center; /* Align text in the center */
+        cursor: pointer; /* Pointer cursor on hover */
+        transition: all 0.3s ease; /* Smooth hover effect */
+        display: inline-block; /* Keeps button inline */
+        }
+
+        .element-container:has(#cancel-after) {
+            display: none; /* Hide certain elements */
+        }
+
+        /* General button styling */
+        .stButton > button {
+            font-size: 16px;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .stButton > button:hover {
+            background-color: #414141;
+            color: #ffffff;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Floating Help Button
+    st.markdown(
+        f"""
+        <a href="https://scribehow.com/embed/Universal_Quote_Template__237rIL_ESWei_zzNG1yp8A?as=scrollable" 
+        target="_blank" class="floating-help-button">
+            <img src="data:image/png;base64,{encoded_img}" alt="Help Icon">
+        </a>
+        """,
         unsafe_allow_html=True,
     )
 
