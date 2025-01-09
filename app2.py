@@ -2012,11 +2012,10 @@ def main():
                         help="Branch",
                         disabled=True
                     ),
-                    "Status": st.column_config.SelectboxColumn(
+                    "Status": st.column_config.Column(
                         "Status",
                         help="Status",
-                        options=["open", "close", "pending"],
-                        required=True,
+                        # options=["open", "close", "pending"],
                         disabled=True
 
                     ),
