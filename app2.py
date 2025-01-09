@@ -469,19 +469,17 @@ def mainPage():
                                     tempLabor_df = st.data_editor(
                                         st.session_state.labor_df,
                                         column_config={
-                                            "Incurred/Proposed": st.column_config.SelectboxColumn(
+                                            "Incurred/Proposed": st.column_config.Column(
                                                 "Incurred/Proposed",
                                                 help="Incurred",
                                                 width=inwidth/6,
                                                 disabled=True,
-                                                options=["Incurred", "Proposed"],
                                             ),
-                                            "Description": st.column_config.SelectboxColumn(
+                                            "Description": st.column_config.Column(
                                                 "Description",
                                                 help="Description",
                                                 width=inwidth/6,
                                                 disabled=True,
-                                                options=concatenated_values
                                             ),
                                             "Nums of Techs": st.column_config.NumberColumn(
                                                 "Nums of Techs",
@@ -658,11 +656,10 @@ def mainPage():
                                     tempTripDf = st.data_editor(
                                         st.session_state.trip_charge_df,
                                         column_config={
-                                            "Incurred/Proposed": st.column_config.SelectboxColumn(
+                                            "Incurred/Proposed": st.column_config.Column(
                                                 "Incurred/Proposed",
                                                 help="Incurred",
                                                 width=inwidth/6,
-                                                options=["Incurred", "Proposed"],
                                                 disabled=True
                                             ),"QTY": st.column_config.NumberColumn(
                                                 "QTY",
@@ -672,11 +669,10 @@ def mainPage():
                                                 step = 0.25,
                                                 disabled=True
                                             ),
-                                            "Description": st.column_config.SelectboxColumn(
+                                            "Description": st.column_config.Column(
                                                 "Description",
                                                 help="Description",
                                                 width=inwidth/4,
-                                                options=concatenated_values,
                                                 disabled=True
                                             ),
                                             "UNIT Price": st.column_config.NumberColumn(
@@ -846,11 +842,10 @@ def mainPage():
                                     tempParts_df = st.data_editor(
                                         st.session_state.parts_df,
                                         column_config={
-                                            "Incurred/Proposed": st.column_config.SelectboxColumn(
+                                            "Incurred/Proposed": st.column_config.Column(
                                                 "Incurred/Proposed",
                                                 help="Incurred",
                                                 width=inwidth/6,
-                                                options=[],
                                                 disabled=True
                                             ),
                                             "QTY": st.column_config.NumberColumn(
@@ -860,11 +855,10 @@ def mainPage():
                                                 min_value=0,
                                                 disabled=True
                                             ),
-                                            "Description": st.column_config.SelectboxColumn(
+                                            "Description": st.column_config.Column(
                                                 "Description",
                                                 help="Description",
                                                 width=inwidth/4,
-                                                options=[''],
                                                 disabled=True
                                             ),
                                             "UNIT Price": st.column_config.NumberColumn(
@@ -1120,10 +1114,18 @@ def mainPage():
                             elif category == 'Miscellaneous Charges':
                                 string_values = [" : "+f'{value:.2f}'.rstrip('0').rstrip('.') for value in st.session_state.misc_ops_df['Fee_Amount']]
                                 concatenated_values = [description + value for description, value in zip(st.session_state.misc_ops_df['Fee_Charge_Type'], string_values)]
-                                with st.form(key='Misc_form'):
-                                    st.session_state.miscellaneous_charges_df = st.data_editor(
-                                        st.session_state.miscellaneous_charges_df,
-                                        column_config={
+                                with st.form(key='Misc_form', clear_on_submit=True):
+                                    st.write("New Miscellaneous")
+                                    misc_data = {
+                                        'Description': [None],
+                                        'QTY': [None],
+                                        'UNIT Price': [None],
+                                        'EXTENDED': [None],
+                                    }
+                                    newMisc_df = pd.DataFrame(misc_data)
+                                    newMisc_df = st.data_editor(
+                                                newMisc_df,
+                                                column_config={
                                             "QTY": st.column_config.NumberColumn(
                                                 "QTY",
                                                 help="Quantity",
@@ -1155,27 +1157,67 @@ def mainPage():
                                         hide_index=True,
                                         width=width,
                                         num_rows="dynamic",
-                                        key=category
-                                    )                        
+                                        key=category+"df"
+                                    )                         
                                     col1, col2 = st.columns([3,1])
                                     submit_button = col2.form_submit_button(label=f'Submit {category}')
                                     if submit_button:
-                                            qty_values = st.session_state.miscellaneous_charges_df['QTY']
-                                            mask = qty_values.notnull() & st.session_state.miscellaneous_charges_df['Description'].notnull()
-                                            st.session_state.miscellaneous_charges_df.loc[mask, 'UNIT Price'] = st.session_state.miscellaneous_charges_df.loc[mask,'Description'].apply(lambda x: re.search(r'(\d+(\.\d+)?)', x).group() if re.search(r'(\d+(\.\.\d+)?)', x) else 0)
-                                            unit_price_values = st.session_state.miscellaneous_charges_df.loc[mask,'UNIT Price']
-                                            st.session_state.miscellaneous_charges_df.loc[mask, 'EXTENDED'] = pd.to_numeric(qty_values[mask], errors='coerce').values * pd.to_numeric(unit_price_values[mask], errors='coerce').values
-                                            if st.session_state.miscellaneous_charges_df.empty:
-                                                misc_charges_data = {
-                                                    'Description': [None],
-                                                    'QTY': [None],
-                                                    'UNIT Price': [None],
-                                                    'EXTENDED': [None]
-                                                }
-                                                st.session_state.miscellaneous_charges_df = pd.DataFrame(misc_charges_data)
-                                            st.rerun()
+                                        qty_values = newMisc_df['QTY']
+                                        mask = qty_values.notnull() & newMisc_df['Description'].notnull()
+                                        newMisc_df.loc[mask, 'UNIT Price'] = newMisc_df.loc[mask,'Description'].apply(lambda x: re.search(r'(\d+(\.\d+)?)', x).group() if re.search(r'(\d+(\.\.\d+)?)', x) else 0)
+                                        unit_price_values = newMisc_df.loc[mask,'UNIT Price']
+                                        newMisc_df.loc[mask, 'EXTENDED'] = pd.to_numeric(qty_values[mask], errors='coerce').values * pd.to_numeric(unit_price_values[mask], errors='coerce').values
+                                        if newMisc_df.empty:
+                                            misc_charges_data = {
+                                                'Description': [None],
+                                                'QTY': [None],
+                                                'UNIT Price': [None],
+                                                'EXTENDED': [None]
+                                            }
+                                        st.session_state.miscellaneous_charges_df = pd.concat([st.session_state.miscellaneous_charges_df, newMisc_df], ignore_index=True)
+                                        st.rerun()
+                                    
+
+                                if not st.session_state.miscellaneous_charges_df.empty:
+                                    st.write("Archived Misc (Delete row when necessary please dont add rows)")
+                                    tempMiscellaneous_charges_df = st.data_editor(
+                                        st.session_state.miscellaneous_charges_df,
+                                        column_config={
+                                            "QTY": st.column_config.NumberColumn(
+                                                "QTY",
+                                                help="Quantity",
+                                                width=inwidth/4,
+                                                min_value=0.00
+                                            ),
+                                            "Description": st.column_config.Column(
+                                                "Description",
+                                                help="Description",
+                                                width=inwidth/4,
+                                            ),
+                                            "UNIT Price": st.column_config.NumberColumn(
+                                                "UNIT Price",
+                                                help="Unit Price",
+                                                width=inwidth/4,
+                                                min_value=0.00,
+                                                step = 0.25,
+                                                disabled=True
+                                            ),
+                                            "EXTENDED": st.column_config.NumberColumn(
+                                                "EXTENDED",
+                                                help="Extended Amount",
+                                                width=inwidth/4,
+                                                min_value=0.00,
+                                                disabled=True
+                                            )
+                                        },
+                                        hide_index=True,
+                                        width=width,
+                                        num_rows="dynamic",
+                                        key=category
+                                    )             
                                     category_total = st.session_state.miscellaneous_charges_df['EXTENDED'].sum()
                                     category_totals[category] = category_total
+                                    
                             elif category == 'Other':
                                 st.write("Include Mileage, Materials/Non Stock, Rentals, and other items here")
                                 with st.form(key=f'{category}_form'):
