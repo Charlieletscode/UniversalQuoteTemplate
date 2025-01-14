@@ -527,10 +527,10 @@ def mainPage():
                                         num_rows="dynamic",
                                         key=category
                                     )
-                                    category_totals[category] = st.session_state.labor_df['EXTENDED'].sum()
                                     if not tempLabor_df.equals(st.session_state.labor_df):
                                         st.session_state.labor_df = pd.DataFrame(tempLabor_df)
                                         st.rerun()
+                                    category_totals[category] = st.session_state.labor_df['EXTENDED'].sum()
                             elif category == 'Trip Charge':
                                 string_values = [" : "+str(value).rstrip('0').rstrip('.') for value in st.session_state.TRatesDf['Billing_Amount']]
                                 concatenated_values = [description + value for description, value in zip(st.session_state.TRatesDf['Pay_Code_Description'], string_values)]
@@ -697,10 +697,10 @@ def mainPage():
                                         num_rows="dynamic",
                                         key=category
                                     )
-                                    category_totals[category] = st.session_state.trip_charge_df['EXTENDED'].sum()
                                     if not tempTripDf.equals(st.session_state.trip_charge_df):
                                         st.session_state.trip_charge_df = pd.DataFrame(tempTripDf)
                                         st.rerun()
+                                    category_totals[category] = st.session_state.trip_charge_df['EXTENDED'].sum()
                             elif category == 'Parts':
                                 st.session_state.input_letters = st.text_input("First enter Part Id or Parts Desc:", max_chars=15).upper()
                                 if st.session_state.input_letters != st.session_state.prev_input_letters and len(st.session_state.input_letters) > 0:
@@ -839,6 +839,7 @@ def mainPage():
                                             st.rerun()
                                 if not st.session_state.parts_df.empty:
                                     st.write("Archived Parts (Delete row when necessary please dont add rows)")
+                                    st.session_state.parts_df.reset_index(drop=True, inplace=True)
                                     tempParts_df = st.data_editor(
                                         st.session_state.parts_df,
                                         column_config={
@@ -1174,9 +1175,9 @@ def mainPage():
                                                 'UNIT Price': [None],
                                                 'EXTENDED': [None]
                                             }
+                                        newMisc_df.dropna(subset=['Description', 'QTY', 'UNIT Price', 'EXTENDED'], inplace=True)
                                         st.session_state.miscellaneous_charges_df = pd.concat([st.session_state.miscellaneous_charges_df, newMisc_df], ignore_index=True)
                                         st.rerun()
-                                    
 
                                 if not st.session_state.miscellaneous_charges_df.empty:
                                     st.write("Archived Misc (Delete row when necessary please dont add rows)")
@@ -1215,6 +1216,9 @@ def mainPage():
                                         num_rows="dynamic",
                                         key=category
                                     )             
+                                    if not tempMiscellaneous_charges_df.equals(st.session_state.miscellaneous_charges_df):
+                                        st.session_state.miscellaneous_charges_df = pd.DataFrame(tempMiscellaneous_charges_df)
+                                        st.rerun()
                                     category_total = st.session_state.miscellaneous_charges_df['EXTENDED'].sum()
                                     category_totals[category] = category_total
                                     
