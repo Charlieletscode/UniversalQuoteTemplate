@@ -888,6 +888,7 @@ def mainPage():
                                     if not tempParts_df.equals(st.session_state.parts_df):
                                         st.session_state.parts_df = pd.DataFrame(tempParts_df)
                                         st.rerun()
+                                st.success("Parts pricing will reflect any additional tariffs from suppliers.")
                             # elif category == 'Parts':
                             #     st.session_state.input_letters = st.text_input("First enter Part Id or Parts Desc:", max_chars=15).upper()
                             #     if st.session_state.input_letters != st.session_state.prev_input_letters and len(st.session_state.input_letters) > 0:
@@ -1399,6 +1400,8 @@ def mainPage():
                             # cleaned_category = category.lower().replace(' ', '_').replace('/', '_')
                             # table_df = getattr(st.session_state, f"{cleaned_category}_df")
                             st.table(table_df)
+                            if category == "Parts":
+                                st.success("Parts pricing will reflect any additional tariffs from suppliers")
                                 
                 left_column_content = """
                 *NOTE: Total (including tax) INCLUDES ESTIMATED SALES* \n*/ USE TAX*
@@ -1497,6 +1500,7 @@ def mainPage():
 
                 text_box_width = 560
                 text_box_height = 100
+                noise = 1.6
                 
                 incurred_text = "Incurred Workdescription: "+str(st.session_state.workDesDf["Incurred"].get(0))
                 proposed_text = "Proposed Workdescription: "+str(st.session_state.workDesDf["Proposed"].get(0))
@@ -1578,6 +1582,14 @@ def mainPage():
                                     col_width = category_column_width * 3
                                 elif col_name in ['QTY', 'UNIT Price', 'EXTENDED', 'Incurred/Proposed']:
                                     col_width = category_column_width
+                            else:
+                                if col_name == 'Description':
+                                    col_width = category_column_width * noise
+                                elif col_name == 'Incurred/Proposed':
+                                    col_width = category_column_width 
+                                else:
+                                    col_width = (577 - category_column_width* (1+noise)) / 5
+
                             c.rect(x, y, col_width, row_height)
                             c.setFont("Arial", 9)
                             c.drawString(x + 5, y + 5, str(col_name))
@@ -1585,46 +1597,36 @@ def mainPage():
                         y -= row_height
                         for row in table_rows:
                             x = 17
-                            count = 0
-                            next_width = None
-                            for col in row:
-                                if count == 0:
-                                    col_width = category_column_width * 3
-                                else:
-                                    col_width = next_width if next_width else category_column_width
+                            for i, col in enumerate(row):
+                                col_name = column_names[i] # Get the column name for the current data cell
 
-                                if col in ['Incurred', 'Proposed', None]:
-                                    col_width = category_column_width
-                                    next_width = category_column_width * 3
-                                else:
-                                    next_width = None
-                                if col is not None and isinstance(col, str):
-                                    match = re.match(r'^[^:\d.]+.*', col)
-                                    if match:
-                                        if y - row_height < margin_bottom:
-                                            c.showPage()
-                                            first_page = False
-                                            y = 750
-                                        first_string = match.group()
-                                        if category == 'Labor' or category == 'Miscellaneous Charges' or category == 'Trip Charge':
-                                            first_string = re.sub(r":.*", "", first_string)
-                                        if category == 'Labor':
-                                            col_width = category_column_width
-                                        c.rect(x, y, col_width, row_height)
-                                        c.setFont("Arial", 9)
-                                        crop = 47
-                                        if len(str(first_string)) < crop:
-                                            c.drawString(x + 5, y + 5, str(first_string))
-                                        else:
-                                            c.drawString(x + 5, y + 5, str(first_string)[:crop])
-                                else:
-                                    if category == 'Labor':
+                                if category != 'Labor':
+                                    if col_name == 'Description':
+                                        col_width = category_column_width * 3
+                                    elif col_name in ['QTY', 'UNIT Price', 'EXTENDED', 'Incurred/Proposed']:
                                         col_width = category_column_width
-                                    c.rect(x, y, col_width, row_height)
-                                    c.setFont("Arial", 9)
-                                    c.drawString(x + 5, y + 5, str(col))
+                                    else:
+                                        col_width = category_column_width # Default
+                                else:
+                                    if col_name == 'Description':
+                                        col_width = category_column_width * noise
+                                    elif col_name == 'Incurred/Proposed':
+                                        col_width = category_column_width
+                                    else:
+                                        col_width = (577 - category_column_width * (1 + noise)) / 5
+
+                                if y - row_height < margin_bottom:
+                                    c.showPage()
+                                    first_page = False
+                                    y = 750
+                                crop = int(col_width / 7) * 15 # Adjust crop based on calculated col_width
+                                c.rect(x, y, col_width, row_height)
+                                c.setFont("Arial", 9)
+                                if isinstance(col, str):
+                                    c.drawString(x + 5, y + 5, col[:crop])
+                                else:
+                                    c.drawRightString(x + col_width - 5, y + 5, str(col)) # Right align numbers
                                 x += col_width
-                                count+=1
                             y -= row_height
                             if new_page_needed:
                                 c.showPage()
@@ -1657,6 +1659,9 @@ def mainPage():
                 c.rect(17, y, block_width, row_height)
                 c.drawRightString(block_width + 12, y + 5, f"Total (including tax): ${total_price_with_tax:.2f}")
                 y -= row_height
+                
+                c.setFont("Arial", 8)
+                c.drawString(17, y - 10, "*Parts pricing will reflect any additional tariffs from suppliers.")
                 c.save()
                 buffer.seek(0)
                 output_pdf = PdfWriter()
@@ -1687,6 +1692,7 @@ def mainPage():
                         st.rerun()
                 else:
                     if st.button("Open PDF"):
+                        print(st.session_state.labor_df)
                         changePdfStatus()
                         st.rerun()
 

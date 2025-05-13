@@ -3,6 +3,14 @@ import pyodbc
 import json
 import os
 import numpy as np
+import re
+
+def sanitize_input(user_input):
+    if isinstance(user_input, str):
+        pattern = re.compile(r"(;|'|\"|--|/\*|\*/|xp_|sp_|exec|drop|delete|insert|update|select|union|sleep|benchmark)", re.IGNORECASE)
+        if pattern.search(user_input):
+            raise ValueError("Potential SQL injection detected in input: " + user_input)
+    return user_input
 
 server = os.environ.get("serverGFT")
 database = os.environ.get("databaseGFT")
@@ -16,6 +24,7 @@ cryptToken = os.environ.get("cryptToken")
 
 # params on 7/30 CircleKkeyBasic, databaseGFT, fmDashtoken1, fmDashtoken2
 def getCredsToken(custnmbr):
+    custnmbr = sanitize_input(custnmbr)
     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
     query = f"""
     DECLARE @KEY NVARCHAR(255) = '{cryptToken}';
@@ -38,7 +47,7 @@ def getCredsToken(custnmbr):
     return tokenDf[tokenDf['CUSTNMBR'].astype(str).str.contains(custnmbr, na=False)]
 
 def getBinddes(input):
-    
+    input = sanitize_input(input)
     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
@@ -86,6 +95,7 @@ def getPartsPrice(partInfoDf):
     return pricingDf
 
 def getAllPrice(ticketN):
+    ticketN = sanitize_input(ticketN)
     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
@@ -119,6 +129,7 @@ def getAllPrice(ticketN):
     return ticketDf, LRatesDf, TRatesDf, misc_ops_df
 
 def getDesc(ticket):
+    ticket = sanitize_input(ticket)
     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
@@ -132,6 +143,7 @@ def getDesc(ticket):
     return workDes
 
 def getAllTicket(ticket):
+    ticket = sanitize_input(ticket)
     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
@@ -290,6 +302,7 @@ def getBranch():
     return branchDf
 
 def getParentByTicket(ticket):
+    ticket = sanitize_input(ticket)
     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
@@ -436,6 +449,7 @@ def updateParent(ticket, editable, ntequote, savetime, approved, declined, branc
     conn.close()
 
 def getVerisaeCreds(ticket):
+    ticket = sanitize_input(ticket)
     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
@@ -467,6 +481,7 @@ def getVerisaeCreds(ticket):
 # execute_stored_procedure("240630-0027")
 
 def deleteTicket(ticket):
+    ticket = sanitize_input(ticket)
     conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
