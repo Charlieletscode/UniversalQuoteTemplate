@@ -95,38 +95,54 @@ def getPartsPrice(partInfoDf):
     return pricingDf
 
 def getAllPrice(ticketN):
-    ticketN = sanitize_input(ticketN)
-    conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
-    conn = pyodbc.connect(conn_str)
-    cursor = conn.cursor()
+    conn = None
+    cursor = None
 
-    sql_query = """Exec [CF_Univ_Quote_Ticket] @Service_TK = ?;"""
-    cursor.execute(sql_query, ticketN)
-    sql_query = cursor.fetchall()
-    rows_transposed = [sql_query for sql_query in zip(*sql_query)]
-    ticketDf = pd.DataFrame(dict(zip(["LOC_Address", "LOC_CUSTNMBR", "LOC_LOCATNNM", "LOC_ADRSCODE", "LOC_CUSTNAME", "LOC_PHONE", "CITY", "STATE", "ZIP", "Pricing_Matrix_Name", "BranchName", "CUST_NAME", "CUST_ADDRESS1", "CUST_ADDRESS2", "CUST_ADDRESS3", "CUST_CITY", "CUST_State", "CUST_Zip", "Tax_Rate", "MailDispatch", "Purchase_Order", "Bill_Customer_Number"], rows_transposed)))
-    sql_query = """Exec [CF_Univ_Quote_LRates] @Service_TK = ?;"""
-    cursor.execute(sql_query, ticketN)
-    sql_query = cursor.fetchall()
-    rows_transposed = [sql_query for sql_query in zip(*sql_query)]
-    LRatesDf = pd.DataFrame(dict(zip(["Billing_Amount", "Pay_Code_Description"], rows_transposed)))
-    
-    sql_query = """Exec [CF_Univ_Quote_TRates] @Service_TK = ?;"""
-    cursor.execute(sql_query, ticketN)
-    sql_query = cursor.fetchall()
-    rows_transposed = [sql_query for sql_query in zip(*sql_query)]
-    TRatesDf = pd.DataFrame(dict(zip([
-    "Billing_Amount", "Pay_Code_Description"], rows_transposed)))
+    # yymmdd - d{4}
+    # yymmdd <= currentdate 
+    # max of ticket num temp no set up 2000
+    # First validate input is safe
+    if not sanitize_input(ticketN):
+        raise ValueError("Invalid characters in ticket ID")
 
-    sql_query = """Exec [CF_Univ_Quote_Fees] @Service_TK = ?;"""
-    cursor.execute(sql_query, ticketN)
-    sql_query = cursor.fetchall()
-    rows_transposed = [sql_query for sql_query in zip(*sql_query)]
-    misc_ops_df = pd.DataFrame(dict(zip([
-    "Fee_Charge_Type", "Fee_Amount"], rows_transposed)))
-    cursor.close()
-    conn.close()
-    return ticketDf, LRatesDf, TRatesDf, misc_ops_df
+    try:
+        conn_str = f"DRIVER={SQLaddress};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes;"
+        conn = pyodbc.connect(conn_str)
+        cursor = conn.cursor()
+
+        sql_query = """Exec [CF_Univ_Quote_Ticket] @Service_TK = ?;"""
+        cursor.execute(sql_query, ticketN)
+        sql_query = cursor.fetchall()
+        rows_transposed = [sql_query for sql_query in zip(*sql_query)]
+        ticketDf = pd.DataFrame(dict(zip(["LOC_Address", "LOC_CUSTNMBR", "LOC_LOCATNNM", "LOC_ADRSCODE", "LOC_CUSTNAME", "LOC_PHONE", "CITY", "STATE", "ZIP", "Pricing_Matrix_Name", "BranchName", "CUST_NAME", "CUST_ADDRESS1", "CUST_ADDRESS2", "CUST_ADDRESS3", "CUST_CITY", "CUST_State", "CUST_Zip", "Tax_Rate", "MailDispatch", "Purchase_Order", "Bill_Customer_Number","NTE"], rows_transposed)))
+        sql_query = """Exec [CF_Univ_Quote_LRates] @Service_TK = ?;"""
+        cursor.execute(sql_query, ticketN)
+        sql_query = cursor.fetchall()
+        rows_transposed = [sql_query for sql_query in zip(*sql_query)]
+        LRatesDf = pd.DataFrame(dict(zip(["Billing_Amount", "Pay_Code_Description"], rows_transposed)))
+        
+        sql_query = """Exec [CF_Univ_Quote_TRates] @Service_TK = ?;"""
+        cursor.execute(sql_query, ticketN)
+        sql_query = cursor.fetchall()
+        rows_transposed = [sql_query for sql_query in zip(*sql_query)]
+        TRatesDf = pd.DataFrame(dict(zip([
+        "Billing_Amount", "Pay_Code_Description"], rows_transposed)))
+
+        sql_query = """Exec [CF_Univ_Quote_Fees] @Service_TK = ?;"""
+        cursor.execute(sql_query, ticketN)
+        sql_query = cursor.fetchall()
+        rows_transposed = [sql_query for sql_query in zip(*sql_query)]
+        misc_ops_df = pd.DataFrame(dict(zip([
+        "Fee_Charge_Type", "Fee_Amount"], rows_transposed)))
+        print(ticketDf)
+        return ticketDf, LRatesDf, TRatesDf, misc_ops_df
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 def getDesc(ticket):
     ticket = sanitize_input(ticket)

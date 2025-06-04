@@ -30,7 +30,7 @@ from datetime import datetime
 from reportlab.pdfgen import canvas
 from PyPDF2 import PdfReader, PdfWriter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib import colors
+from reportlab.lib.colors import red, black
 from reportlab.platypus import Paragraph
 import numpy as np
 import re
@@ -1479,6 +1479,34 @@ def mainPage():
                 c.drawString(25, 655.55, str(st.session_state.ticketDf['CUST_ADDRESS2'].values[0]) + " " + str(st.session_state.ticketDf['CUST_ADDRESS3'].values[0]) + " " +
                             str(st.session_state.ticketDf['CUST_CITY'].values[0]) + " " + str(st.session_state.ticketDf['CUST_Zip'].values[0]))
                 
+                if st.session_state.ticketDf["NTE"][0] != 0 and total_price_with_tax > st.session_state.ticketDf["NTE"][0]:
+                        # Define box dimensions and position (adjust as needed)
+                    box_width = 200
+                    box_height = 50
+                    box_x = (letter[0] - box_width) *3 / 4 # Center horizontally
+                    box_y = 720 # Adjust vertical position
+
+                    # Draw the rectangle (box)
+                    c.setStrokeColor(red) # Border color
+                    c.setFillColor(red)   # Fill color (optional, can be white or transparent)
+                    c.rect(box_x, box_y, box_width, box_height, stroke=1, fill=0) # stroke=1 for border, fill=0 for no fill
+
+                    # Draw the "NTE EXCEEDED" text
+                    text_content = "NTE EXCEEDED"
+                    text_font_size = 24 # Large font size
+                    c.setFont("Helvetica-Bold", text_font_size) # Use a bold font and large size
+                    c.setFillColor(red) # Text color
+
+                    # Calculate text position to center it in the box
+                    text_width = c.stringWidth(text_content, "Helvetica-Bold", text_font_size)
+                    text_x = box_x + (box_width - text_width) / 2
+                    text_y = box_y + (box_height - text_font_size) / 2 # Simple vertical centering
+
+                    c.drawString(text_x, text_y, text_content)
+                c.setFont("Arial", 9)
+                c.setStrokeColor(black) # Border color
+                c.setFillColor(black) 
+                
                 c.drawString(50, 582, str(st.session_state.ticketDf['LOC_LOCATNNM'].values[0]))
                 c.drawString(50, 572, st.session_state.ticketDf['LOC_Address'].values[0] + " " + st.session_state.ticketDf['CITY'].values[0] + " " + 
                     st.session_state.ticketDf['STATE'].values[0]+ " " + st.session_state.ticketDf['ZIP'].values[0])
@@ -1692,7 +1720,7 @@ def mainPage():
                         st.rerun()
                 else:
                     if st.button("Open PDF"):
-                        print(st.session_state.labor_df)
+                        # print(st.session_state.labor_df)
                         changePdfStatus()
                         st.rerun()
 
