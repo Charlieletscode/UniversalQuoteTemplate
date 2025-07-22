@@ -1332,9 +1332,9 @@ def mainPage():
                                         if st.session_state.get("subcontractor_df", None) is None or st.session_state.subcontractor_df.empty:
                                             subcontractor_data = {
                                                 'Description': [None],
-                                                'QTY': [None],
-                                                'UNIT Price': [None],
-                                                'EXTENDED': [None]
+                                                'QTY': [np.nan],
+                                                'UNIT Price': [np.nan],
+                                                'EXTENDED': [np.nan]
                                             }
                                             st.session_state.subcontractor_df = pd.DataFrame(subcontractor_data)
                                         st.rerun()
