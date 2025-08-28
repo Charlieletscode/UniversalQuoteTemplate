@@ -134,7 +134,6 @@ def getAllPrice(ticketN):
         rows_transposed = [sql_query for sql_query in zip(*sql_query)]
         misc_ops_df = pd.DataFrame(dict(zip([
         "Fee_Charge_Type", "Fee_Amount"], rows_transposed)))
-        print(ticketDf)
         return ticketDf, LRatesDf, TRatesDf, misc_ops_df
     except Exception as e:
         print(f"An error occurred: {e}")

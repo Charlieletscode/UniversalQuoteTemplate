@@ -130,11 +130,11 @@ def deleteTicketDiaglog(ticket):
     confirm_col, cancel_col = st.columns(2)
     if confirm_col.button("Confirm Delete", key="confirm"):
         deleteTicket(ticket)
-        print("Item deleted successfully.")
+        # print("Item deleted successfully.")
         time.sleep(2)  
         refresh()  
     elif cancel_col.button("Cancel", key="cancel"):
-        print("Deletion canceled.")
+        # print("Deletion canceled.")
         st.rerun()
 
 def mainPage():        
@@ -261,17 +261,17 @@ def mainPage():
                     parts_data = {
                         'Incurred/Proposed': [None],
                         'Description': [None],
-                        'QTY': [None],
-                        'UNIT Price': [None],
-                        'EXTENDED': [None],
+                        'QTY': [np.nan],
+                        'UNIT Price': [np.nan],
+                        'EXTENDED': [np.nan]
                     }
                     st.session_state.temp_parts_df = pd.DataFrame(parts_data)
                 if st.session_state.get("miscellaneous_charges_df", None) is None or st.session_state.miscellaneous_charges_df.empty:
                     misc_charges_data = {
                         'Description': [None],
-                        'QTY': [None],
-                        'UNIT Price': [None],
-                        'EXTENDED': [None]
+                        'QTY': [np.nan],
+                        'UNIT Price': [np.nan],
+                        'EXTENDED': [np.nan]
                     }
                     st.session_state.miscellaneous_charges_df = pd.DataFrame(misc_charges_data)
 
@@ -279,18 +279,18 @@ def mainPage():
                     materials_rentals_data = {
                         'Incurred/Proposed': [None],
                         'Description': [None],
-                        'QTY': [None],
-                        'UNIT Price': [None],
-                        'EXTENDED': [None]
+                        'QTY': [np.nan],
+                        'UNIT Price': [np.nan],
+                        'EXTENDED': [np.nan]
                     }
                     st.session_state.materials_non_stock_and_rentals_df = pd.DataFrame(materials_rentals_data)
 
                 if st.session_state.get("subcontractor_df", None) is None or st.session_state.subcontractor_df.empty:
                     subcontractor_data = {
                         'Description': [None],
-                        'QTY': [None],
-                        'UNIT Price': [None],
-                        'EXTENDED': [None]
+                        'QTY': [np.nan],
+                        'UNIT Price': [np.nan],
+                        'EXTENDED': [np.nan]
                     }
                     st.session_state.subcontractor_df = pd.DataFrame(subcontractor_data)
                 st.write("**UNLESS SPECIFICALLY NOTED, THIS PROPOSAL IS VALID FOR 30 DAYS FROM THE DATE ABOVE**")
@@ -316,7 +316,6 @@ def mainPage():
                         # st.markdown('<span id="decline-after"></span>', unsafe_allow_html=True)
                         # origin "decline" in st.session_state
                         if st.sidebar.button("**Decline**"):
-                            print("decline clicked")
                             declinetime = datetime.now()
                             decline = declinetime.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
                             updateAll(st.session_state.ticketN, str(st.session_state.workDesDf["Incurred"].get(0)), str(st.session_state.workDesDf["Proposed"].get(0)), st.session_state.labor_df, st.session_state.trip_charge_df, st.session_state.parts_df, st.session_state.miscellaneous_charges_df, st.session_state.materials_non_stock_and_rentals_df, st.session_state.subcontractor_df)
@@ -329,7 +328,6 @@ def mainPage():
                         # st.markdown('<span id="delete-after"></span>', unsafe_allow_html=True)
                         # origin "decline" in st.session_state
                         if st.sidebar.button("**Delete Quote**"):
-                            print("delete clicked")
                             st.sidebar.warning("Ticket deleted successfully.")
                             deleteTicketDiaglog(st.session_state.ticketN)
                 if st.session_state.editable and st.session_state.edit:
@@ -702,9 +700,11 @@ def mainPage():
                                         st.rerun()
                                     category_totals[category] = st.session_state.trip_charge_df['EXTENDED'].sum()
                             elif category == 'Parts':
-                                st.session_state.input_letters = st.text_input("First enter Part Id or Parts Desc:", max_chars=15).upper()
+                                st.session_state.input_letters = st.text_input("First enter Part Id or Parts Desc:", max_chars=30).upper()
                                 if st.session_state.input_letters != st.session_state.prev_input_letters and len(st.session_state.input_letters) > 0:
-                                    st.session_state.pricingDf = getBinddes(st.session_state.input_letters)
+                                    curr = (st.session_state.input_letters or "").upper()[:15]
+                                    st.session_state.pricingDf = getBinddes(curr)
+                                    print(curr, st.session_state.pricingDf)
                                     st.session_state.prev_input_letters = st.session_state.input_letters
                                 if st.session_state.pricingDf is None or st.session_state.pricingDf.empty:
                                     st.error("Please enter a valid Part Id or Part Desc.")
@@ -1240,6 +1240,8 @@ def mainPage():
                                                 help="Quantity",
                                                 width=inwidth/6,
                                                 min_value=0,
+                                                step=0.01,
+                                                format="%.2f"
                                                 
                                             ),
                                             "Description": st.column_config.TextColumn(
@@ -1251,13 +1253,16 @@ def mainPage():
                                                 "UNIT Price",
                                                 help="Unit Price",
                                                 width=inwidth/6,
-                                                min_value=0.00
+                                                min_value=0.00,
+                                                step=0.01,
+                                                format="%.2f"
                                             ),
                                             "EXTENDED": st.column_config.NumberColumn(
                                                 "EXTENDED",
                                                 help="Extended Amount",
                                                 width=inwidth/6,
                                                 min_value=0.00,
+                                                step=0.01,
                                                 format="%.2f",
                                                 disabled=True
                                             )
@@ -1278,9 +1283,9 @@ def mainPage():
                                             materials_rentals_data = {
                                                 'Incurred/Proposed': [None],
                                                 'Description': [None],
-                                                'QTY': [None],
-                                                'UNIT Price': [None],
-                                                'EXTENDED': [None]
+                                                'QTY': [np.nan],
+                                                'UNIT Price': [np.nan],
+                                                'EXTENDED': [np.nan]
                                             }
                                             st.session_state.materials_non_stock_and_rentals_df = pd.DataFrame(materials_rentals_data)
                                         st.rerun()
@@ -1295,6 +1300,8 @@ def mainPage():
                                                 "QTY",
                                                 help="Quantity",
                                                 width=inwidth/4,
+                                                step=0.01,
+                                                format="%.2f",
                                                 min_value=0.00
                                             ),
                                             "Description": st.column_config.TextColumn(
@@ -1306,6 +1313,8 @@ def mainPage():
                                                 "UNIT Price",
                                                 help="Unit Price",
                                                 width=inwidth/4,
+                                                step=0.01,
+                                                format="%.2f",
                                                 min_value=0.00
                                             ),
                                             "EXTENDED": st.column_config.NumberColumn(
