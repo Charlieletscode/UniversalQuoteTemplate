@@ -2145,9 +2145,48 @@ def main():
     #     ticketInfo()
     # elif selection == "Pricing":
     #     pricing()
+import threading
+import threading, time, pytz
+from datetime import datetime, timedelta
+from gilbarco_scrape import devscrape   # make sure this import path matches your project
+
+def run_daily_dev_scrape():
+    """Run devscrape() every day at 6 AM Eastern Time."""
+    tz_est = pytz.timezone("US/Eastern")
+
+    while True:
+        now_est = datetime.now(tz_est)
+        target_time = now_est.replace(hour=6, minute=0, second=0, microsecond=0)
+
+        # if it's already past 6 AM today → schedule for tomorrow
+        if now_est >= target_time:
+            target_time += timedelta(days=1)
+
+        wait_seconds = (target_time - now_est).total_seconds()
+
+        print(f"🕕 Next devscrape() scheduled for: {target_time.strftime('%Y-%m-%d %H:%M:%S %Z')} "
+              f"({int(wait_seconds)} seconds from now)")
+        time.sleep(wait_seconds)
+
+        try:
+            print(f"🚀 Starting devscrape() at {datetime.now(tz_est).strftime('%Y-%m-%d %H:%M:%S %Z')}")
+            devscrape()
+            print(f"✅ devscrape() finished at {datetime.now(tz_est).strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        except Exception as e:
+            print(f"❌ Error during devscrape run: {e}")
+
+        # Sleep 60 seconds to avoid retriggering immediately if system clock drifts
+        time.sleep(60)
 
 if __name__ == "__main__":
+    # Start your main process
     main()
-    # print("getto: http://localhost:8501/")
+    threading.Thread(target=run_daily_dev_scrape, daemon=True).start()
+    # --- optional: start another process like Streamlit, etc.
+    # print("Go to: http://localhost:8501/")
     # sys.argv = ["streamlit", "run", "app2.py"]
     # sys.exit(stcli.main())
+
+    # Keep main alive if needed
+    while True:
+        pass
