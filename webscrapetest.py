@@ -1,61 +1,47 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.common.exceptions import NoSuchElementException, WebDriverException
-from selenium.webdriver.support.ui import Select
-from datetime import datetime, timedelta
-from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
-import schedule
-import pytz
-import os
-import time
-import csv
+from selenium.common.exceptions import NoSuchElementException, WebDriverException
+from webdriver_manager.chrome import ChromeDriverManager
+from datetime import datetime, timedelta
 import pandas as pd
+import time, os, pytz
 
-from servertest import insertCommPayment
-from servertest import insertWarrPayment, selectByDateCommPayment, selectByDateWarrPayment, insertAuditLog
-from servertest import getCredsToken, insertCommPaymentDev, selectCommPaymentDev, selectByDateCommPaymentDev, deleteCommPaymentDev, deleteCommPaymentByDateDev
-from servertest import insertWarrPaymentDev, selectWarrPaymentDev, selectByDateWarrPaymentDev, deleteWarrPaymentDev, deleteWarrPaymentByDateDev
-from servertest import insertAuditLogDev, selectAuditLogDev, deleteAuditLogDev
+from servertest import (
+    getCredsToken,
+    insertWarrPayment, insertCommPayment, selectByDateWarrPayment, selectByDateCommPayment,
+    insertWarrPaymentDev, insertCommPaymentDev, selectByDateWarrPaymentDev, selectByDateCommPaymentDev,
+    insertAuditLogDev, insertAuditLog
+)
 
-chrome_options = Options()
-# chrome_options.add_argument("--headless")  # Comment this out to run with GUI
-chrome_options.add_argument("--disable-gpu")  # Disable GPU acceleration
-webdriver_path = 'chromedriver-win64/chromedriver.exe'  # Update this to your WebDriver path
+LOGIN_URL = "https://interactive.gilbarco.com"
+AIM_URL = "https://interactive.gilbarco.com/apps/service_reports/warranty_commissions.cfm"
 
-service = Service(webdriver_path)
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
-driver.maximize_window()
 
-login_url = 'https://interactive.gilbarco.com'
-aim_url = 'https://interactive.gilbarco.com/apps/service_reports/warranty_commissions.cfm'
+# -------------------------------
+# 🧰 Utility Functions
+# -------------------------------
+def create_driver(headless=True):
+    """Creates and returns a new Chrome driver instance."""
+    chrome_options = Options()
+    if headless:
+        chrome_options.add_argument("--headless=new")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    chrome_options.add_experimental_option('useAutomationExtension', False)
 
-# get in to warranty_commissions
-def gillogin(timeout = 5):
-    driver.get(login_url)
-    username_field = driver.find_element(By.NAME, 'user_id')
-    password_field = driver.find_element(By.NAME, 'loginpassword')
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    driver.set_page_load_timeout(60)
+    return driver
 
-    credsDf = getCredsToken("GIL0001")
-    username_field.send_keys(credsDf['CUSTNAME'])
-    password_field.send_keys(credsDf['Decrypted_Token_Value'])
 
-    login_button = driver.find_element(By.XPATH, '//button[text()="Accept and Login"]')
-    login_button.click()
-    driver.get(aim_url)
-    time.sleep(10)
-    if "warranty_commissions" in driver.current_url:
-        print("Login successful")
-    else:
-        print("Failed to login")
-    time.sleep(timeout) 
-# 2024-01-01 2024-05-28
-
-def gilDatechoose(timeout, formatted_date, warrantyPaymentReportDf, commissionPaymentReportDf):    
+def gilDatechoose(driver, timeout, formatted_date, warrantyPaymentReportDf, commissionPaymentReportDf):    
     from_date_field = driver.find_element(By.CSS_SELECTOR, 'input#from_date')
     driver.execute_script("arguments[0].removeAttribute('readonly')", from_date_field)
     from_date_field.send_keys(formatted_date)
@@ -82,7 +68,7 @@ def gilDatechoose(timeout, formatted_date, warrantyPaymentReportDf, commissionPa
     process_button.click()
     time.sleep(timeout)
 
-def gilTransCSV(timeout, current_date, maxretries = 5):
+def gilTransCSV(driver, timeout, current_date, maxretries = 5):
     retry = 0
     while retry < maxretries:
         try:
@@ -138,28 +124,57 @@ def gilTransCSV(timeout, current_date, maxretries = 5):
     print("❌ Max retries reached. Data could not be extracted.")
     return [pd.DataFrame(), pd.DataFrame()]
 
-def gilScrape(timeout, formatted_date, warrantyPaymentReportDf, commissionPaymentReportDf, current_date):
-    dropdown = None
-    screenshot_dir = f"log_{current_date}_ss"
-    os.makedirs(screenshot_dir, exist_ok=True)  # create folder if not exists
+def safe_quit(driver):
+    """Safely quits Chrome."""
+    try:
+        if driver:
+            driver.quit()
+    except Exception:
+        pass
 
+
+def gilbarco_login(driver):
+    if driver is None:
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+        driver.maximize_window()
+    """Logs into the Gilbarco Interactive portal."""
+    creds = getCredsToken("GIL0001")
+    driver.get(LOGIN_URL)
+    WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.NAME, "user_id")))
+
+    driver.find_element(By.NAME, "user_id").send_keys(creds["CUSTNAME"])
+    driver.find_element(By.NAME, "loginpassword").send_keys(creds["Decrypted_Token_Value"])
+    driver.find_element(By.XPATH, '//button[text()="Accept and Login"]').click()
+
+    WebDriverWait(driver, 30).until(lambda d: "gilbarco.com" in d.current_url)
+    driver.get(AIM_URL)
+    time.sleep(3)
+    print("✅ Logged into Gilbarco portal.")
+
+
+def gilbarco_scrape(driver, formatted_date, current_date, dev=True, timeout=5):
+    """Scrape one day of Gilbarco warranty + commission reports."""
+    warrantyPaymentReportDf, commissionPaymentReportDf = pd.DataFrame(), pd.DataFrame()
+    screenshot_dir = f"log_{current_date}_ss"
+    os.makedirs(screenshot_dir, exist_ok=True)
+
+    # find dropdown with retry
+    dropdown = None
     for attempt in range(3):
         try:
-            driver.get(aim_url)
-            dropdown = driver.find_element(By.ID, 'sr_selected_branch')
-            break  # ✅ success → break retry loop
-        except NoSuchElementException:
-            print(f"Attempt {attempt + 1}: Could not find the 'sr_selected_branch' dropdown. Retrying in 1 second...")
-        except WebDriverException as e:
-            print(f"WebDriverException on attempt {attempt+1}: {e}")
-       
-        time.sleep(1)  # wait before retry
-
+            driver.get(AIM_URL)
+            dropdown = WebDriverWait(driver, 20).until(
+                EC.presence_of_element_located((By.ID, "sr_selected_branch"))
+            )
+            break
+        except Exception as e:
+            print(f"Attempt {attempt+1}: dropdown not found ({e}). Retrying...")
+            time.sleep(2)
     if not dropdown:
-        print("❌ Failed to locate dropdown after 3 attempts.")
-        return  # exit gracefully
+        print("❌ Dropdown not found after 3 attempts.")
+        return
 
-    # ✅ Continue normal scraping
+    # iterate branches
     initial_select = Select(dropdown)
     options = [(option.get_attribute('value'), option.text) for option in initial_select.options]
 
@@ -168,11 +183,11 @@ def gilScrape(timeout, formatted_date, warrantyPaymentReportDf, commissionPaymen
         select = Select(dropdown)
         select.select_by_value(option_value)
 
-        gilDatechoose(timeout=1, formatted_date=formatted_date,
+        gilDatechoose(driver=driver, timeout=1, formatted_date=formatted_date,
                       warrantyPaymentReportDf=warrantyPaymentReportDf,
                       commissionPaymentReportDf=commissionPaymentReportDf)
 
-        twoDf = gilTransCSV(timeout=1, current_date=current_date)
+        twoDf = gilTransCSV(driver=driver, timeout=1, current_date=current_date)
 
         if twoDf and not twoDf[0].empty:
             commissionPaymentReportDf = pd.concat([commissionPaymentReportDf, twoDf[0]], ignore_index=True)
@@ -182,93 +197,73 @@ def gilScrape(timeout, formatted_date, warrantyPaymentReportDf, commissionPaymen
 
         print("warrantyypayreport", warrantyPaymentReportDf, "commissionpayreport", commissionPaymentReportDf) 
         time.sleep(timeout)
+    # ✅ Safe insert section
+    if not commissionPaymentReportDf.empty:
+        print(f"💰 Inserting {len(commissionPaymentReportDf)} commission rows.")
+        (insertCommPaymentDev if dev else insertCommPayment)(commissionPaymentReportDf)
+    else:
+        print("⚠️ No commission data found — skipping.")
+
+    if not warrantyPaymentReportDf.empty:
+        print(f"🧾 Inserting {len(warrantyPaymentReportDf)} warranty rows.")
+        (insertWarrPaymentDev if dev else insertWarrPayment)(warrantyPaymentReportDf)
+    else:
+        print("⚠️ No warranty data found — skipping warranty insert.")
 
 
-    # Fill NaN values except for excluded columns
-    cols_to_exclude_warranty = ['Check', 'Check_Date']
-    warrantyPaymentReportDf = warrantyPaymentReportDf.apply(
-        lambda x: x if x.name in cols_to_exclude_warranty else x.fillna(0))
-
-    cols_to_exclude_commission = ['Check']
-    commissionPaymentReportDf = commissionPaymentReportDf.apply(
-        lambda x: x if x.name in cols_to_exclude_commission else x.fillna(0))
-    if(len(warrantyPaymentReportDf) +len(commissionPaymentReportDf) < 0):
-        
-        # 📸 Save screenshot on failure
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        screenshot_path = os.path.join(screenshot_dir, f"error_attempt{attempt+1}_{timestamp}.png")
-        driver.save_screenshot(screenshot_path)
-        print(f"Screenshot saved at {screenshot_path}")
-    # else:
-        # insertWarrPayment(warrantyPaymentReportDf)  
-        # insertCommPayment(commissionPaymentReportDf)
-        # warrantyPaymentReportDf.to_csv(f'{formatted_date} Warranty Payment Report.csv', index=False)
-        # commissionPaymentReportDf.to_csv(f'{formatted_date} Commission Payment Report.csv', index=False)
-
-# prod
+# -------------------------------
+# 🚀 Main Scraper Runners
+# -------------------------------
 def devscrape():
-    try:
-        current_dt = datetime.now()   # datetime object
-        current_date = current_dt.strftime('%Y-%m-%d')  # string
-        previous_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    """Development version: uses Dev tables."""
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    formatted_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
-        warrantyPaymentReportDf = pd.DataFrame()
-        commissionPaymentReportDf = pd.DataFrame()
-        print(len(selectByDateCommPaymentDev(current_date)) + len(selectByDateCommPaymentDev(current_date)))
-        max_retries = 6
-        attempts = 1
-        # Loop while no data exists AND under retry limit
-        while (len(selectByDateCommPaymentDev(current_date)) + len(selectByDateCommPaymentDev(current_date)) == 0) and attempts < max_retries:
-            gillogin(timeout=1)
-            gilScrape(
-                timeout=2,
-                formatted_date=previous_date,
-                warrantyPaymentReportDf=warrantyPaymentReportDf,
-                commissionPaymentReportDf=commissionPaymentReportDf,
-                current_date=current_date
-            )
+    for attempt in range(1, 6):
+        driver = None
+        try:
+            print(f"🚀 Dev run attempt {attempt}/5 for {formatted_date}")
+            driver = create_driver(headless=True)
+            gilbarco_login(driver)
+            gilbarco_scrape(driver, formatted_date, current_date, dev=True)
+            insertAuditLogDev("SUCCESS", "GilbarcoScraperDev", 1, datetime.now())
+            print("✅ Dev scrape completed successfully.")
+            break
+        except Exception as e:
+            print(f"❌ Dev attempt {attempt} failed: {e}")
+            insertAuditLogDev("FAILED", "GilbarcoScraperDev", 0, f"Dev attempt {attempt} failed: {e}", datetime.now())
+            time.sleep(10)
+        finally:
+            safe_quit(driver)
 
-            # if(len(selectByDateCommPayment(current_date)) + len(selectByDateWarrPayment(current_date)) > 0):
-            #     insertAuditLog(status="Success",table_name="WarrPayment",record_count=len(selectByDateWarrPayment(current_date)),timestamp=datetime.now())
-            #     insertAuditLog(status="Success",table_name="DateCommPayment",record_count=len(selectByDateCommPayment(current_date)),timestamp=datetime.now())
-            #     break
-            # else:
-            #     insertAuditLog(status="Success",table_name="GilbarcoScraper",record_count=0,timestamp=datetime.now())
 
-            attempts += 1
-            print(f"Attempt {attempts} complete. Sleeping before retry...")
-            time.sleep(20)  # backoff to avoid hammering
-            driver.quit()
-            driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
-            driver.maximize_window()
-            print("Data found, stopping retries.")
+def prodscrape():
+    """Production version: writes to live tables."""
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    formatted_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
-    except Exception as e:
-        # insertAuditLog(status=e,table_name="GilbarcoScraper",record_count=0,timestamp=datetime.now())
-        print(f"An error occurred: {e}. Waiting 100 sec before exit.")
-        time.sleep(100)
+    for attempt in range(1, 6):
+        driver = None
+        try:
+            print(f"🚀 Prod run attempt {attempt}/5 for {formatted_date}")
+            driver = create_driver(headless=True)
+            gilbarco_login(driver)
+            gilbarco_scrape(driver, formatted_date, current_date, dev=False)
+            insertAuditLog("SUCCESS", "GilbarcoScraper", 1, datetime.now())
+            print("✅ Prod scrape completed successfully.")
+            break
+        except Exception as e:
+            print(f"❌ Prod attempt {attempt} failed: {e}")
+            insertAuditLog("FAILED", "GilbarcoScraper", 0, datetime.now())
+            time.sleep(10)
+        finally:
+            safe_quit(driver)
 
-    finally:
-        driver.quit()
-
-# est = pytz.timezone('US/Eastern')
-# now = datetime.now(est)
-# current_timeAddoneMin = "03:00"
-# current_time_add_one_min = now + timedelta(minutes=1)
-# # comment following line off to do it at 3 
-# current_timeAddoneMin = current_time_add_one_min.strftime("%H:%M")
-# print(current_timeAddoneMin)
-# schedule.every().day.at(current_timeAddoneMin).do(job)
-# def run_scheduler():
-#     while True:
-#         now = datetime.now(est)
-#         current_time = now.strftime("%H:%M")
-
-#         schedule.run_pending()
-#         time.sleep(60)
 
 # if __name__ == "__main__":
-#     run_scheduler()
-
-
-
+#     # toggle here
+#     DEV_MODE = True
+#     if DEV_MODE:
+#         devscrape()
+#     else:
+#         prodscrape()

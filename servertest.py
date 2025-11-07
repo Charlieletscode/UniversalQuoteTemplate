@@ -895,27 +895,20 @@ def insertAuditLog(status, table_name, record_count, timestamp=None, printQuery=
     :param printQuery: bool - print the query and values
     """
     try:
+        if timestamp is None:
+            timestamp = datetime.now()
+
         conn = pyodbc.connect(conn_str)
         cursor = conn.cursor()
 
-        query = '''
-            INSERT INTO [dbo].[CF_T_GVR_AuditLog] (
-                [Status],
-                [Timestamp],
-                [TableInserted],
-                [RecordCount]
-            )
+        sql = """
+            INSERT INTO [dbo].[CF_T_GVR_AuditLog]
+            ([Status], [TableName], [RecordCount], [TimeStamp])
             VALUES (?, ?, ?, ?)
-        '''
+        """
 
-        ts = timestamp or datetime.now()
-
-        values = (status, ts, table_name, record_count)
-
-        if printQuery:
-            print(query, values)
-
-        cursor.execute(query, values)
+        values = (status, table_name, record_count, timestamp)
+        cursor.execute(sql, values)
         conn.commit()
         print("Audit log inserted successfully.")
 
