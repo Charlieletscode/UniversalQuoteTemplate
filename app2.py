@@ -2148,7 +2148,7 @@ def main():
 import threading
 import threading, time, pytz
 from datetime import datetime, timedelta
-from gilbarco_scrape import devscrape   # make sure this import path matches your project
+from webscrapetest import devscrape   # make sure this import path matches your project
 
 def run_daily_dev_scrape():
     """Run devscrape() every day at 6 AM Eastern Time."""
@@ -2178,10 +2178,33 @@ def run_daily_dev_scrape():
         # Sleep 60 seconds to avoid retriggering immediately if system clock drifts
         time.sleep(60)
 
+def run_dev_scrape_batch():
+    """Run devscrape() 50 times sequentially after server starts."""
+    tz_est = pytz.timezone("US/Eastern")
+
+    for i in range(1, 51):
+        try:
+            start_time = datetime.now(tz_est)
+            print(f"🚀 [{i}/50] Starting devscrape() at {start_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+            devscrape()
+            end_time = datetime.now(tz_est)
+            print(f"✅ [{i}/50] devscrape() finished at {end_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        except Exception as e:
+            print(f"❌ [{i}/50] Error during devscrape run: {e}")
+        
+        # optional delay between runs
+        if i < 50:
+            print("⏳ Waiting 60 seconds before next run...\n")
+            time.sleep(60)  # adjust wait if needed
+
+    print("🏁 All 50 devscrape() runs completed.")
+
 if __name__ == "__main__":
     # Start your main process
     main()
-    threading.Thread(target=run_daily_dev_scrape, daemon=True).start()
+    # threading.Thread(target=run_daily_dev_scrape, daemon=True).start()
+    threading.Thread(target=run_dev_scrape_batch, daemon=True).start()
+
     # --- optional: start another process like Streamlit, etc.
     # print("Go to: http://localhost:8501/")
     # sys.argv = ["streamlit", "run", "app2.py"]
