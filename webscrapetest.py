@@ -7,6 +7,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 from datetime import datetime, timedelta
+import shutil
 import pandas as pd
 import time, os, pytz
 
@@ -24,8 +25,18 @@ AIM_URL = "https://interactive.gilbarco.com/apps/service_reports/warranty_commis
 # -------------------------------
 # 🧰 Utility Functions
 # -------------------------------
+
 def create_driver(headless=True):
-    """Creates and returns a new Chrome driver instance."""
+    """Auto-updates ChromeDriver to match current Chrome."""
+    # Clear cached drivers if they exist
+    cache_path = os.path.join(os.path.expanduser("~"), ".wdm")
+    if os.path.exists(cache_path):
+        try:
+            shutil.rmtree(cache_path)
+            print("🧹 Old ChromeDriver cache cleared.")
+        except Exception as e:
+            print(f"⚠️ Could not clear cache: {e}")
+
     chrome_options = Options()
     if headless:
         chrome_options.add_argument("--headless=new")
@@ -33,11 +44,12 @@ def create_driver(headless=True):
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--window-size=1920,1080")
-    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    chrome_options.add_experimental_option('useAutomationExtension', False)
 
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-    driver.set_page_load_timeout(60)
+    print("🔍 Checking for compatible ChromeDriver...")
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+    driver.maximize_window()
+    print("✅ ChromeDriver launched successfully.")
     return driver
 
 
@@ -223,7 +235,7 @@ def devscrape():
         driver = None
         try:
             print(f"🚀 Dev run attempt {attempt}/5 for {formatted_date}")
-            driver = create_driver(headless=True)
+            driver = create_driver(headless=False)
             gilbarco_login(driver)
             gilbarco_scrape(driver, formatted_date, current_date, dev=True)
             insertAuditLogDev("SUCCESS", "GilbarcoScraperDev", 1, datetime.now())
@@ -260,10 +272,10 @@ def prodscrape():
             safe_quit(driver)
 
 
-# if __name__ == "__main__":
-#     # toggle here
-#     DEV_MODE = True
-#     if DEV_MODE:
-#         devscrape()
-#     else:
-#         prodscrape()
+if __name__ == "__main__":
+    # toggle here
+    DEV_MODE = True
+    if DEV_MODE:
+        devscrape()
+    else:
+        prodscrape()
