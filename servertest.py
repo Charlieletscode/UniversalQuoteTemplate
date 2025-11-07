@@ -1199,14 +1199,23 @@ def deleteWarrPaymentByDateDev(exec_date: str):
 # 🟢 AUDIT LOG DEV FUNCTIONS
 # ================================================================
 def insertAuditLogDev(status, table_name, record_count, notes="", timestamp=None, printQuery=False):
+    """
+    Inserts a log into CF_T_GVR_AuditLog_DEV including the terminal (cwd) location.
+    """
     query = '''
         INSERT INTO [dbo].[CF_T_GVR_AuditLog_DEV] 
         ([Status],[Timestamp],[TableInserted],[NOTES],[RecordCount])
         VALUES (?, ?, ?, ?, ?)
     '''
+
+    # auto-detect current working directory (terminal location)
+    place = os.getcwd()
     ts = timestamp or datetime.now()
-    vals = (status, ts, table_name, notes, record_count)
+    note_text = f"[{place}] {notes}" if notes else place
+
+    vals = (status, ts, table_name, note_text, record_count)
     print(vals)
+
     try:
         conn = pyodbc.connect(conn_str)
         cursor = conn.cursor()
@@ -1343,7 +1352,7 @@ warr_df = pd.DataFrame([
 # print(len(selectByDateCommPaymentDev(current_date))+len(selectByDateWarrPaymentDev(current_date)))
 
 
-# print(selectAuditLogDev())
+print(selectAuditLogDev())
 # print(selectCommPaymentDev())
 # print(len(selectByDateCommPaymentDev(current_date))+len(selectByDateWarrPaymentDev(current_date)))
 # deleteCommPaymentByDateDev(current_date)
