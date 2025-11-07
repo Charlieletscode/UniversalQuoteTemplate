@@ -1352,7 +1352,7 @@ warr_df = pd.DataFrame([
 # print(len(selectByDateCommPaymentDev(current_date))+len(selectByDateWarrPaymentDev(current_date)))
 
 
-print(selectAuditLogDev())
+# print(selectAuditLogDev())
 # print(selectCommPaymentDev())
 # print(len(selectByDateCommPaymentDev(current_date))+len(selectByDateWarrPaymentDev(current_date)))
 # deleteCommPaymentByDateDev(current_date)
