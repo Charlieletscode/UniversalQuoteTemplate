@@ -2145,41 +2145,17 @@ def main():
     #     ticketInfo()
     # elif selection == "Pricing":
     #     pricing()
+import os
+import sys
 import threading
-import threading, time, pytz
+import time
+import pytz
 from datetime import datetime, timedelta
-from webscrapetest import devscrape   # make sure this import path matches your project
-
-def run_daily_dev_scrape():
-    """Run devscrape() every day at 6 AM Eastern Time."""
-    tz_est = pytz.timezone("US/Eastern")
-
-    while True:
-        now_est = datetime.now(tz_est)
-        target_time = now_est.replace(hour=6, minute=0, second=0, microsecond=0)
-
-        # if it's already past 6 AM today → schedule for tomorrow
-        if now_est >= target_time:
-            target_time += timedelta(days=1)
-
-        wait_seconds = (target_time - now_est).total_seconds()
-
-        print(f"🕕 Next devscrape() scheduled for: {target_time.strftime('%Y-%m-%d %H:%M:%S %Z')} "
-              f"({int(wait_seconds)} seconds from now)")
-        time.sleep(wait_seconds)
-
-        try:
-            print(f"🚀 Starting devscrape() at {datetime.now(tz_est).strftime('%Y-%m-%d %H:%M:%S %Z')}")
-            devscrape()
-            print(f"✅ devscrape() finished at {datetime.now(tz_est).strftime('%Y-%m-%d %H:%M:%S %Z')}")
-        except Exception as e:
-            print(f"❌ Error during devscrape run: {e}")
-
-        # Sleep 60 seconds to avoid retriggering immediately if system clock drifts
-        time.sleep(60)
+from streamlit.web import cli as stcli
 
 def run_dev_scrape_batch():
     """Run devscrape() 50 times sequentially after server starts."""
+    from webscrapetest import devscrape
     tz_est = pytz.timezone("US/Eastern")
 
     for i in range(1, 51):
@@ -2191,25 +2167,23 @@ def run_dev_scrape_batch():
             print(f"✅ [{i}/50] devscrape() finished at {end_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         except Exception as e:
             print(f"❌ [{i}/50] Error during devscrape run: {e}")
-        
-        # optional delay between runs
         if i < 50:
             print("⏳ Waiting 60 seconds before next run...\n")
-            time.sleep(60)  # adjust wait if needed
-
+            time.sleep(60)
     print("🏁 All 50 devscrape() runs completed.")
+    
 
 if __name__ == "__main__":
-    # Start your main process
-    main()
-    # threading.Thread(target=run_daily_dev_scrape, daemon=True).start()
-    threading.Thread(target=run_dev_scrape_batch, daemon=True).start()
+    # Detect if we're already running under Streamlit
+    if os.environ.get("STREAMLIT_RUNTIME") != "1":
+        # Start background scraper
+        threading.Thread(target=run_dev_scrape_batch, daemon=True).start()
 
-    # --- optional: start another process like Streamlit, etc.
-    # print("Go to: http://localhost:8501/")
-    # sys.argv = ["streamlit", "run", "app2.py"]
-    # sys.exit(stcli.main())
-
-    # Keep main alive if needed
-    while True:
-        pass
+        # Launch Streamlit (fresh runtime)
+        sys.argv = ["streamlit", "run", "app2.py"]
+        os.environ["STREAMLIT_RUNTIME"] = "1"  # mark this run as the runtime process
+        sys.exit(stcli.main())
+    else:
+        # This block executes only *inside* Streamlit runtime
+        # → don’t relaunch Streamlit or you’ll get RuntimeError
+        main()

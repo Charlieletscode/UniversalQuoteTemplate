@@ -206,49 +206,50 @@ def gilScrape(timeout, formatted_date, warrantyPaymentReportDf, commissionPaymen
         # commissionPaymentReportDf.to_csv(f'{formatted_date} Commission Payment Report.csv', index=False)
 
 # prod
-try:
-    current_dt = datetime.now()   # datetime object
-    current_date = current_dt.strftime('%Y-%m-%d')  # string
-    previous_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+def devscrape():
+    try:
+        current_dt = datetime.now()   # datetime object
+        current_date = current_dt.strftime('%Y-%m-%d')  # string
+        previous_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
 
-    warrantyPaymentReportDf = pd.DataFrame()
-    commissionPaymentReportDf = pd.DataFrame()
-    print(len(selectByDateCommPaymentDev(current_date)) + len(selectByDateCommPaymentDev(current_date)))
-    max_retries = 6
-    attempts = 1
-    # Loop while no data exists AND under retry limit
-    while (len(selectByDateCommPaymentDev(current_date)) + len(selectByDateCommPaymentDev(current_date)) == 0) and attempts < max_retries:
-        gillogin(timeout=1)
-        gilScrape(
-            timeout=2,
-            formatted_date=previous_date,
-            warrantyPaymentReportDf=warrantyPaymentReportDf,
-            commissionPaymentReportDf=commissionPaymentReportDf,
-            current_date=current_date
-        )
+        warrantyPaymentReportDf = pd.DataFrame()
+        commissionPaymentReportDf = pd.DataFrame()
+        print(len(selectByDateCommPaymentDev(current_date)) + len(selectByDateCommPaymentDev(current_date)))
+        max_retries = 6
+        attempts = 1
+        # Loop while no data exists AND under retry limit
+        while (len(selectByDateCommPaymentDev(current_date)) + len(selectByDateCommPaymentDev(current_date)) == 0) and attempts < max_retries:
+            gillogin(timeout=1)
+            gilScrape(
+                timeout=2,
+                formatted_date=previous_date,
+                warrantyPaymentReportDf=warrantyPaymentReportDf,
+                commissionPaymentReportDf=commissionPaymentReportDf,
+                current_date=current_date
+            )
 
-        # if(len(selectByDateCommPayment(current_date)) + len(selectByDateWarrPayment(current_date)) > 0):
-        #     insertAuditLog(status="Success",table_name="WarrPayment",record_count=len(selectByDateWarrPayment(current_date)),timestamp=datetime.now())
-        #     insertAuditLog(status="Success",table_name="DateCommPayment",record_count=len(selectByDateCommPayment(current_date)),timestamp=datetime.now())
-        #     break
-        # else:
-        #     insertAuditLog(status="Success",table_name="GilbarcoScraper",record_count=0,timestamp=datetime.now())
+            # if(len(selectByDateCommPayment(current_date)) + len(selectByDateWarrPayment(current_date)) > 0):
+            #     insertAuditLog(status="Success",table_name="WarrPayment",record_count=len(selectByDateWarrPayment(current_date)),timestamp=datetime.now())
+            #     insertAuditLog(status="Success",table_name="DateCommPayment",record_count=len(selectByDateCommPayment(current_date)),timestamp=datetime.now())
+            #     break
+            # else:
+            #     insertAuditLog(status="Success",table_name="GilbarcoScraper",record_count=0,timestamp=datetime.now())
 
-        attempts += 1
-        print(f"Attempt {attempts} complete. Sleeping before retry...")
-        time.sleep(20)  # backoff to avoid hammering
+            attempts += 1
+            print(f"Attempt {attempts} complete. Sleeping before retry...")
+            time.sleep(20)  # backoff to avoid hammering
+            driver.quit()
+            driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+            driver.maximize_window()
+            print("Data found, stopping retries.")
+
+    except Exception as e:
+        # insertAuditLog(status=e,table_name="GilbarcoScraper",record_count=0,timestamp=datetime.now())
+        print(f"An error occurred: {e}. Waiting 100 sec before exit.")
+        time.sleep(100)
+
+    finally:
         driver.quit()
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
-        driver.maximize_window()
-        print("Data found, stopping retries.")
-
-except Exception as e:
-    # insertAuditLog(status=e,table_name="GilbarcoScraper",record_count=0,timestamp=datetime.now())
-    print(f"An error occurred: {e}. Waiting 100 sec before exit.")
-    time.sleep(100)
-
-finally:
-    driver.quit()
 
 # est = pytz.timezone('US/Eastern')
 # now = datetime.now(est)
