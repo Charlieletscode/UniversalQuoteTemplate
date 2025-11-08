@@ -4,6 +4,7 @@ import sys
 import pandas as pd
 from streamlit.web import cli as stcli
 import os
+import threading
 import webbrowser
 import requests
 from PIL import Image
@@ -2144,46 +2145,35 @@ def main():
     # elif selection == "Ticket Info":
     #     ticketInfo()
     # elif selection == "Pricing":
-    #     pricing()
-import os
-import sys
-import threading
-import time
-import pytz
-from datetime import datetime, timedelta
-from streamlit.web import cli as stcli
+    #     pricing()    
 
-def run_dev_scrape_batch():
-    """Run devscrape() 50 times sequentially after server starts."""
-    from webscrapetest import devscrape
-    tz_est = pytz.timezone("US/Eastern")
 
+def background_scraper():
+    """Run devscrape() 50 times on startup, non-blocking."""
+    from webscrapetest import devscrape  # import inside to avoid circular import
     for i in range(1, 51):
         try:
-            start_time = datetime.now(tz_est)
-            print(f"🚀 [{i}/50] Starting devscrape() at {start_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+            print(f"🚀 [{i}/50] Starting devscrape() at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             devscrape()
-            end_time = datetime.now(tz_est)
-            print(f"✅ [{i}/50] devscrape() finished at {end_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+            print(f"✅ [{i}/50] devscrape() finished.")
         except Exception as e:
-            print(f"❌ [{i}/50] Error during devscrape run: {e}")
-        if i < 50:
-            print("⏳ Waiting 60 seconds before next run...\n")
-            time.sleep(60)
-    print("🏁 All 50 devscrape() runs completed.")
-    
+            print(f"❌ [{i}/50] Error in devscrape(): {e}")
+        time.sleep(60)  # 1-minute pause between runs
 
 if __name__ == "__main__":
-    # Detect if we're already running under Streamlit
-    if os.environ.get("STREAMLIT_RUNTIME") != "1":
-        # Start background scraper
-        threading.Thread(target=run_dev_scrape_batch, daemon=True).start()
+    # 🚀 Start background scraping thread
+    scraper_thread = threading.Thread(target=background_scraper, daemon=True)
+    scraper_thread.start()
 
-        # Launch Streamlit (fresh runtime)
-        sys.argv = ["streamlit", "run", "app2.py"]
-        os.environ["STREAMLIT_RUNTIME"] = "1"  # mark this run as the runtime process
-        sys.exit(stcli.main())
-    else:
-        # This block executes only *inside* Streamlit runtime
-        # → don’t relaunch Streamlit or you’ll get RuntimeError
-        main()
+    # 🧠 Then launch Streamlit on port 8000
+    print(f"🚀 Launching Streamlit at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    streamlit_cmd = [
+        sys.executable, "-m", "streamlit", "run",
+        os.path.abspath(__file__),
+        "--server.port", "8000",
+        "--server.address", "0.0.0.0",
+        "--server.headless", "true",
+        "--server.enableCORS", "false"
+    ]
+    print(f"▶ Running command: {' '.join(streamlit_cmd)}")
+    subprocess.run(streamlit_cmd, check=False)

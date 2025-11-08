@@ -7,7 +7,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 from datetime import datetime, timedelta
-import shutil
+import shutil, subprocess
 import pandas as pd
 import time, os, pytz
 
@@ -26,32 +26,44 @@ AIM_URL = "https://interactive.gilbarco.com/apps/service_reports/warranty_commis
 # 🧰 Utility Functions
 # -------------------------------
 
-def create_driver(headless=True):
-    """Auto-updates ChromeDriver to match current Chrome."""
-    # Clear cached drivers if they exist
-    cache_path = os.path.join(os.path.expanduser("~"), ".wdm")
-    if os.path.exists(cache_path):
-        try:
-            shutil.rmtree(cache_path)
-            print("🧹 Old ChromeDriver cache cleared.")
-        except Exception as e:
-            print(f"⚠️ Could not clear cache: {e}")
 
+def create_driver(headless=True):
     chrome_options = Options()
-    if headless:
-        chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--window-size=1920,1080")
+    if headless:
+        chrome_options.add_argument("--headless=new")
+
+    # 🧹 clear cached old drivers if wrong version remains
+    cache_dir = os.path.expanduser("~/.wdm")
+    if os.path.exists(cache_dir):
+        shutil.rmtree(cache_dir, ignore_errors=True)
+        print("🧹 Cleared old ChromeDriver cache")
 
     print("🔍 Checking for compatible ChromeDriver...")
-    service = Service(ChromeDriverManager().install())
+
+    # 🔹 Try to detect system Chrome
+    chrome_path = shutil.which("google-chrome") or shutil.which("chromium-browser")
+    if not chrome_path:
+        print("⚠️ Chrome not found — installing Chromium...")
+        subprocess.run(
+            "apt-get update && apt-get install -y chromium-browser chromium-chromedriver",
+            shell=True, check=False
+        )
+        chrome_path = shutil.which("chromium-browser")
+
+    # 🔹 Download matching driver
+    driver_path = ChromeDriverManager().install()
+    print(f"🧩 Using ChromeDriver: {driver_path}")
+
+    service = Service(driver_path)
     driver = webdriver.Chrome(service=service, options=chrome_options)
     driver.maximize_window()
-    print("✅ ChromeDriver launched successfully.")
+    time.sleep(5)
+    print("✅ Chrome started successfully")
     return driver
-
 
 def gilDatechoose(driver, timeout, formatted_date, warrantyPaymentReportDf, commissionPaymentReportDf):    
     from_date_field = driver.find_element(By.CSS_SELECTOR, 'input#from_date')
@@ -272,10 +284,10 @@ def prodscrape():
             safe_quit(driver)
 
 
-if __name__ == "__main__":
-    # toggle here
-    DEV_MODE = True
-    if DEV_MODE:
-        devscrape()
-    else:
-        prodscrape()
+# if __name__ == "__main__":
+#     # toggle here
+#     DEV_MODE = True
+#     if DEV_MODE:
+#         devscrape()
+#     else:
+#         prodscrape()
