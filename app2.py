@@ -4,7 +4,6 @@ import sys
 import pandas as pd
 from streamlit.web import cli as stcli
 import os
-import threading
 import webbrowser
 import requests
 from PIL import Image
@@ -2145,35 +2144,10 @@ def main():
     # elif selection == "Ticket Info":
     #     ticketInfo()
     # elif selection == "Pricing":
-    #     pricing()    
-
-
-def background_scraper():
-    """Run devscrape() 50 times on startup, non-blocking."""
-    from webscrapetest import devscrape  # import inside to avoid circular import
-    for i in range(1, 51):
-        try:
-            print(f"🚀 [{i}/50] Starting devscrape() at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            devscrape()
-            print(f"✅ [{i}/50] devscrape() finished.")
-        except Exception as e:
-            print(f"❌ [{i}/50] Error in devscrape(): {e}")
-        time.sleep(60)  # 1-minute pause between runs
+    #     pricing()
 
 if __name__ == "__main__":
-    # 🚀 Start background scraping thread
-    scraper_thread = threading.Thread(target=background_scraper, daemon=True)
-    scraper_thread.start()
-
-    # 🧠 Then launch Streamlit on port 8000
-    print(f"🚀 Launching Streamlit at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    streamlit_cmd = [
-        sys.executable, "-m", "streamlit", "run",
-        os.path.abspath(__file__),
-        "--server.port", "8000",
-        "--server.address", "0.0.0.0",
-        "--server.headless", "true",
-        "--server.enableCORS", "false"
-    ]
-    print(f"▶ Running command: {' '.join(streamlit_cmd)}")
-    subprocess.run(streamlit_cmd, check=False)
+    main()
+    # print("getto: http://localhost:8501/")
+    # sys.argv = ["streamlit", "run", "app2.py"]
+    # sys.exit(stcli.main())
